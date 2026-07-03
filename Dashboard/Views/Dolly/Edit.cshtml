@@ -1,0 +1,86 @@
+﻿@model THYLoggerAPI_POSTGRESQL.Model.Dolly
+
+@{
+    ViewData["Title"] = "Dolly Düzenle";
+}
+
+<div class="card">
+    <div class="card-header border-bottom">
+        <h4 class="card-title">Dolly Düzenle: <span class="text-primary">@Model.SerialNumber</span></h4>
+    </div>
+    <div class="card-body mt-2">
+        @* Tag Helper kullanımı URL hatalarını önler *@
+        <form class="form form-vertical" asp-controller="Dolly" asp-action="Edit" method="post">
+
+            @* Model Binding için ID gizli alan olarak kalmalı *@
+            <input type="hidden" asp-for="Id" />
+
+            <div class="row">
+                <div class="col-12 col-md-6 mb-1">
+                    <label class="form-label" for="SerialNumber">Seri Numarası</label>
+                    <div class="input-group input-group-merge">
+                        <span class="input-group-text"><i data-feather="hash"></i></span>
+                        <input type="text" asp-for="SerialNumber" class="form-control" placeholder="Seri Numarası Giriniz" readonly />
+                    </div>
+                </div>
+
+                <div class="col-12 col-md-6 mb-1">
+                    <label class="form-label" for="Name">Dolly İsmi</label>
+                    <div class="input-group input-group-merge">
+                        <span class="input-group-text"><i data-feather="truck"></i></span>
+                        <input type="text" asp-for="Name" class="form-control" placeholder="Dolly İsmi Giriniz" />
+                    </div>
+                </div>
+
+                <div class="col-12 mb-2">
+                    <div class="d-flex align-items-center mt-1">
+                        <div class="form-check form-switch form-check-primary">
+                            <input type="checkbox"
+                                   class="form-check-input"
+                                   id="IsActive"
+                                   name="IsActive"
+                                   value="true"
+                                   @(Model.IsActive ? "checked" : "") />
+
+                            <input type="hidden" name="IsActive" value="false" />
+
+                            <label class="form-check-label" for="IsActive">
+                                <span class="switch-icon-left"><i data-feather="check"></i></span>
+                                <span class="switch-icon-right"><i data-feather="x"></i></span>
+                            </label>
+                        </div>
+                        <label class="form-check-label fw-bolder ms-1" for="IsActive">(Aktif/Pasif)</label>
+                    </div>
+                    
+                </div>
+
+                <hr />
+
+                <div class="col-12 text-end">
+                    <button type="submit" class="btn btn-primary me-1">
+                        <i data-feather="save" class="me-25"></i> Değişiklikleri Kaydet
+                    </button>
+                    <a href="/Dolly/List" class="btn btn-outline-secondary">
+                        <i data-feather="x" class="me-25"></i> İptal
+                    </a>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        $(window).on('load', function() {
+            // Feather ikonlarını render et
+            if (feather) {
+                feather.replace();
+            }
+        });
+
+        // Form gönderilirken butonun çift tıklanmasını engelle
+        $('form').on('submit', function() {
+            $(this).find('button[type="submit"]').prop('disabled', true);
+        });
+    </script>
+}

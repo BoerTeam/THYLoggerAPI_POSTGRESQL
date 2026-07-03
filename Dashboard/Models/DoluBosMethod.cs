@@ -1,0 +1,40 @@
+﻿using Newtonsoft.Json;
+using RestSharp;
+
+namespace Dashboard.Models
+{
+    public class DoluBosMethod
+    {
+        public static List<THYLoggerAPI_POSTGRESQL.Model.BosDolu> GetAllDoluBosMethod()
+        {
+            try
+            {
+                var client = new RestClient("https://localhost:44347/api/DoluBos/Get");
+                var request = new RestRequest();
+                request.Method = Method.Get;
+
+                RestResponse response = client.Execute(request);
+
+                if (response.IsSuccessful && !string.IsNullOrEmpty(response.Content))
+                {
+                    var dataModel = JsonConvert.DeserializeObject<List<THYLoggerAPI_POSTGRESQL.Model.BosDolu>>(response.Content);
+
+                    if (dataModel != null)
+                    {
+                        foreach (var item in dataModel)
+                        {
+                            if (item.Time.HasValue)
+                                item.Time = item.Time.Value.ToLocalTime();
+                        }
+                    }
+                    return dataModel;
+                }
+                return new List<THYLoggerAPI_POSTGRESQL.Model.BosDolu>();
+            }
+            catch (Exception)
+            {
+                return new List<THYLoggerAPI_POSTGRESQL.Model.BosDolu>();
+            }
+        }
+    }
+}

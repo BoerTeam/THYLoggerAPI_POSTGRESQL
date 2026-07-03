@@ -1,0 +1,260 @@
+﻿@{
+    Layout = "_Layout";
+}
+
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Havalimanı Telemetri & Geofence Paneli</title>
+    @* <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" /> *@
+    <link href="~/map/leaflet.css" rel="stylesheet" />
+    @* <link rel="stylesheet" href="https://unpkg.com/@@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.css" /> *@
+    <link href="~/map/leaflet-geoman.css" rel="stylesheet" />
+    <style>
+        #map {
+            height: 70vh;
+            width: 100%;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            margin: 0;
+            padding: 15px;
+            background: #f0f2f5;
+        }
+
+        .main-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .bottom-panel {
+            display: flex;
+            gap: 20px;
+            height: 25vh;
+        }
+
+        .info-panel {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .chart-panel {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            flex: 2;
+        }
+
+        .status-pill {
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            display: inline-block;
+            margin: 2px;
+        }
+
+        .out-bounds {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #f87171;
+        }
+
+        .save-btn {
+            background: #27ae60;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 10px;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="main-container">
+        <div id="map"></div>
+
+        <div class="bottom-panel">
+            <div class="info-panel" id="panel">
+                <h3>📡 Sistem Durumu</h3>
+                <div id="stats">Veri bekleniyor...</div>
+                <button class="save-btn" onclick="saveNewGeofence()">Yeni Alanı Kaydet</button>
+            </div>
+
+            <div class="chart-panel">
+                @* <canvas id="telemetryChart"></canvas> *@
+            </div>
+        </div>
+    </div>
+
+    @* <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script> *@
+    <script src="~/map/leaflet.js"></script>
+    @* <script src="https://unpkg.com/@@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.min.js"></script> *@
+    <script src="~/map/leaflet-geoman.min.js"></script>
+    @* <script src="https://unpkg.com/@@turf/turf@6/turf.min.js"></script> *@
+    <script src="~/map/turf.min.js"></script>
+    @* <script src="https://cdn.jsdelivr.net/npm/chart.js"></script> *@
+    <script src="~/map/chart.js"></script>
+    <script>
+                delete L.Icon.Default.prototype._getIconUrl;
+        L.Icon.Default.mergeOptions({
+            iconRetinaUrl: '/map/marker-icon-2x.png',
+            iconUrl: '/map/marker-icon.png',
+            shadowUrl: '/map/marker-shadow.png',
+        });
+        // 1. Harita Kurulumu
+        const map = L.map('map').setView([41.2761, 28.7287], 13);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
+
+        // 2. Dinamik Geofence Ayarları (Geoman)
+        map.pm.addControls({
+            position: 'topleft',
+            drawMarker: false,
+            drawCircleMarker: false,
+            drawPolyline: false,
+            drawRectangle: true,
+            drawPolygon: true,
+            editMode: true,
+            dragMode: true,
+            removalMode: true
+        });
+
+                let areaCoords = [
+            [41.2850, 28.7050], [41.2950, 28.7450], [41.2650, 28.7550],
+            [41.2550, 28.7150], [41.2850, 28.7050]
+        ];
+
+        let geofencePolygon = L.polygon(areaCoords, {
+            color: '#27ae60', weight: 2, fillOpacity: 0.1, dashArray: '5, 5'
+        }).addTo(map);
+
+        // Turf.js için aktif poligon nesnesi
+        let turfFence = turf.polygon([areaCoords.map(c => [c[1], c[0]])]);
+
+        // Kullanıcı alanı değiştirdiğinde Turf nesnesini güncelle
+        map.on('pm:create pm:edit pm:remove', function() {
+            const layers = map.pm.getGeomanLayers();
+            if(layers.length > 0) {
+                const lastLayer = layers[layers.length - 1];
+                const coords = lastLayer.getLatLngs()[0];
+                const turfFormat = coords.map(c => [c.lng, c.lat]);
+                turfFormat.push(turfFormat[0]); // Kapat
+                turfFence = turf.polygon([turfFormat]);
+                console.log("Geofence güncellendi.");
+            }
+        });
+
+        // 3. İzlenecek Nesneler (Simülasyon Verisi)
+                  // 3. İzlenecek Nesneler (10 Adet Simülasyon Verisi)
+        const objects = [
+            { id: 1, name: "Dolly 01", coords: [41.2765, 28.7290], path: [], color: '#3498db' },
+            { id: 2, name: "Dolly 02", coords: [41.2780, 28.7310], path: [], color: '#9b59b6' },
+            { id: 3, name: "Dolly 03", coords: [41.2800, 28.7250], path: [], color: '#f1c40f' },
+            { id: 4, name: "Teknik Araç 1", coords: [41.2750, 28.7300], path: [], color: '#e67e22' },
+            { id: 5, name: "Teknik Araç 2", coords: [41.2720, 28.7200], path: [], color: '#1abc9c' },
+            { id: 6, name: "Forklift 01", coords: [41.2820, 28.7400], path: [], color: '#34495e' },
+            { id: 7, name: "Forklift 02", coords: [41.2700, 28.7350], path: [], color: '#2ecc71' },
+            { id: 8, name: "Dolly 04", coords: [41.2740, 28.7450], path: [], color: '#7f8c8d' },
+            { id: 9, name: "Dolly 05", coords: [41.2850, 28.7280], path: [], color: '#d35400' },
+            { id: 10, name: "Güvenlik Aracı", coords: [41.2795, 28.7150], path: [], color: '#2980b9' }
+        ];
+
+        // Marker ve Polyline'ları haritaya ekle
+        objects.forEach(obj => {
+            obj.marker = L.marker(obj.coords).addTo(map).bindPopup(obj.name);
+            obj.polyline = L.polyline([], { color: obj.color, weight: 3, opacity: 0.6 }).addTo(map);
+        });
+
+        // 4. Grafik Kurulumu (Chart.js)
+        // const ctx = document.getElementById('telemetryChart').getContext('2d');
+        // const telemetryChart = new Chart(ctx, {
+        //     type: 'line',
+        //     data: {
+        //         labels: [],
+        //         datasets: [
+        //             { label: 'Sıcaklık (°C)', borderColor: '#e74c3c', data: [], tension: 0.3 },
+        //             { label: 'Nem (%)', borderColor: '#3498db', data: [], tension: 0.3 }
+        //         ]
+        //     },
+        //     options: { responsive: true, maintainAspectRatio: false }
+        // });
+
+        // 5. Ana Döngü (API'den veri çekme simülasyonu)
+        function updateSystem() {
+            let outCount = 0;
+            let statusHTML = "";
+
+            objects.forEach(obj => {
+                // Hareket Simülasyonu (Burada Fetch API kullanabilirsin)
+                obj.coords[0] += (Math.random() - 0.5) * 0.001;
+                obj.coords[1] += (Math.random() - 0.5) * 0.001;
+
+                obj.path.push([...obj.coords]);
+                if(obj.path.length > 30) obj.path.shift();
+
+                obj.marker.setLatLng(obj.coords);
+                obj.polyline.setLatLngs(obj.path);
+
+                // Geofence Kontrolü
+                const pt = turf.point([obj.coords[1], obj.coords[0]]);
+                const isInside = turf.booleanPointInPolygon(pt, turfFence);
+
+                if (!isInside) {
+                    outCount++;
+                    obj.marker.getElement().style.filter = "hue-rotate(150deg)";
+                    obj.polyline.setStyle({ color: 'red' });
+                    statusHTML += `<div class="status-pill out-bounds">⚠️ ${obj.name} DIŞARIDA!</div><br>`;
+                } else {
+                    obj.marker.getElement().style.filter = "none";
+                    obj.polyline.setStyle({ color: '#3498db' });
+                }
+            });
+
+            // Grafik Güncelleme (Rastgele Sensör Verisi)
+            // const now = new Date().toLocaleTimeString();
+            // telemetryChart.data.labels.push(now);
+            // telemetryChart.data.datasets[0].data.push((20 + Math.random() * 5).toFixed(1));
+            // telemetryChart.data.datasets[1].data.push((40 + Math.random() * 10).toFixed(1));
+
+            // if(telemetryChart.data.labels.length > 15) {
+            //     telemetryChart.data.labels.shift();
+            //     telemetryChart.data.datasets.forEach(d => d.data.shift());
+            // }
+            // telemetryChart.update('none');
+
+            document.getElementById('stats').innerHTML = `
+                <b>Durum:</b> ${outCount > 0 ? '⚠️ KRİTİK' : '✅ NORMAL'}<br>
+                <b>Aktif İhlal:</b> ${outCount}<br><hr>
+                ${statusHTML || 'Sınır ihlali yok.'}
+            `;
+        }
+
+        // Yeni alanı DB'ye kaydetmek için fonksiyon
+        function saveNewGeofence() {
+            const layers = map.pm.getGeomanLayers();
+            if(layers.length > 0) {
+                const coords = layers[layers.length - 1].getLatLngs();
+                alert("Yeni Geofence Koordinatları Hazır!\nAPI'ye POST edilebilir.");
+                console.log(coords);
+                // Burada fetch('/api/save-geofence', { method: 'POST', body: JSON.stringify(coords) }) yapabilirsin.
+            }
+        }
+
+        setInterval(updateSystem, 2000);
+    </script>
+
+</body>
+</html>

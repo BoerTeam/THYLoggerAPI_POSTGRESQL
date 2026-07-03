@@ -1,0 +1,8 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<config>
+	<server>
+		<!--<ServiceLink>http://iis.boer.com.tr:13192/api</ServiceLink>-->
+		<!--<ServiceLink>http://iis.boer.com.tr:5000/</ServiceLink>-->
+		<ServiceLink>http://localhost:44347/</ServiceLink>
+	</server>
+</config>

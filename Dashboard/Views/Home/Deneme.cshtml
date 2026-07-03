@@ -1,0 +1,239 @@
+﻿@model MultiModel
+@using Newtonsoft.Json
+
+@{
+    ViewData["Title"] = "Dolly Geçmiş İzleme";
+}
+
+<section id="dolly-history-page">
+    <link href="~/map/leaflet.css" rel="stylesheet" />
+    <style>
+        .history-card {
+            border: none;
+            box-shadow: 0 4px 24px 0 rgba(34, 41, 47, 0.1);
+            margin-bottom: 2rem;
+        }
+
+        .map-container {
+            height: 65vh;
+            width: 100%;
+            border-radius: 0 0 8px 8px;
+            border: 1px solid #ebe9f1;
+            z-index: 1;
+        }
+
+        .filter-header {
+            background: #ffffff;
+            padding: 1.5rem;
+            border-radius: 8px 8px 0 0;
+            border: 1px solid #ebe9f1;
+            border-bottom: none;
+        }
+
+        #controlsRow {
+            background: #fff;
+            padding: 1.2rem;
+            border-radius: 10px;
+            border: 1px solid #7367f0;
+            margin-top: -20px;
+            position: relative;
+            z-index: 10;
+            width: 95%;
+            margin-left: auto;
+            margin-right: auto;
+            display: none; /* Veri gelince açılacak */
+        }
+
+        .info-pill {
+            background: #f3f2f7;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+        }
+    </style>
+
+    <div class="row">
+        <div class="col-12">
+            <div class="card history-card">
+                <div class="filter-header">
+                    <div class="row align-items-end g-2">
+                        <div class="col-md-3">
+                            <label class="form-label fw-bolder">Dolly Seçin</label>
+                            <select id="dollySelect" class="form-select">
+                                <option value="">Seçiniz...</option>
+                                @foreach (var d in Model.DollyList)
+                                {
+                                    <option value="@d.Id">@d.Name (@d.SerialNumber)</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bolder">Başlangıç</label>
+                            <input type="datetime-local" id="startDate" class="form-control">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bolder">Bitiş</label>
+                            <input type="datetime-local" id="endDate" class="form-control">
+                        </div>
+                        <div class="col-md-3 d-flex gap-1">
+                            <button class="btn btn-primary w-100" onclick="loadHistory()">
+                                🔍 Sorgula
+                            </button>
+                            <button class="btn btn-outline-secondary" onclick="location.reload()">
+                                🔄
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="history-map" class="map-container"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="controlsRow" class="row shadow-lg align-items-center">
+        <div class="col-md-4">
+            <div class="d-flex align-items-center">
+                <div class="avatar bg-light-primary p-1 me-2">🚀</div>
+                <div>
+                    <h6 class="mb-0 fw-bold" id="txtDollyName">-</h6>
+                    <span class="info-pill" id="txtPointCount">0 Nokta</span>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 text-center">
+            <div class="btn-group">
+                <button class="btn btn-success px-2" id="btnStart" onclick="startPlayback()">▶ Oynat</button>
+                <button class="btn btn-danger px-2" onclick="stopPlayback()">⏹ Durdur</button>
+            </div>
+        </div>
+        <div class="col-md-4 text-end">
+            <div class="d-inline-block text-start">
+                <label class="small fw-bold d-block">Hız Ayarı</label>
+                <select id="speedSelect" class="form-select form-select-sm" style="width:120px;">
+                    <option value="800">1x Yavaş</option>
+                    <option value="300" selected>2x Normal</option>
+                    <option value="50">5x Hızlı</option>
+                </select>
+            </div>
+        </div>
+    </div>
+</section>
+
+<script src="~/map/leaflet.js"></script>
+<script>
+    let map, polyline, movingMarker;
+    let gpsData = [];
+    let currentIndex = 0;
+    let timer = null;
+
+    // Harita Başlatma
+    document.addEventListener("DOMContentLoaded", function () {
+        map = L.map('history-map').setView([41.2765, 28.7295], 14); // İstanbul Havalimanı
+        delete L.Icon.Default.prototype._getIconUrl;
+        L.Icon.Default.mergeOptions({
+            iconRetinaUrl: '/map/marker-icon-2x.png',
+    iconUrl: '/map/marker-icon.png',
+    shadowUrl: '/map/marker-shadow.png',
+        })
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap'
+        }).addTo(map);
+
+        polyline = L.polyline([], {
+            color: '#7367f0',
+            weight: 4,
+            opacity: 0.7,
+            dashArray: '5, 10'
+        }).addTo(map);
+
+        movingMarker = L.marker([0, 0]).addTo(map);
+    });
+
+    // Dinamik Veri Çekme (AJAX)
+        async function loadHistory() {
+        const id = document.getElementById('dollySelect').value;
+        const start = document.getElementById('startDate').value;
+        const end = document.getElementById('endDate').value;
+
+        // Sadece Cihaz Seçimi Zorunlu
+        if (!id) {
+            alert("Lütfen bir Dolly seçiniz.");
+            return;
+        }
+
+        stopPlayback();
+        currentIndex = 0;
+
+        try {
+            // URL'yi oluştururken tarihler boşsa boş string gider, C# tarafı null olarak yakalar
+            const url = `/Home/GetHistoryData?id=${id}&start=${start}&end=${end}`;
+
+            // Yükleme sırasında kullanıcıya bilgi ver
+            document.getElementById('controlsRow').style.display = 'flex';
+            document.getElementById('txtPointCount').innerText = "Veriler getiriliyor...";
+
+            const response = await fetch(url);
+            gpsData = await response.json();
+
+            if (!gpsData || gpsData.length === 0) {
+                alert("Kayıtlı hareket verisi bulunamadı.");
+                document.getElementById('controlsRow').style.display = 'none';
+                return;
+            }
+
+            // Arayüz Bilgileri
+            document.getElementById('txtDollyName').innerText = document.getElementById('dollySelect').options[document.getElementById('dollySelect').selectedIndex].text;
+            document.getElementById('txtPointCount').innerText = `${gpsData.length} Konum Noktası Listelendi`;
+
+            // Harita Çizimi
+            const path = gpsData.map(p => [
+                parseFloat(p.lat.toString().replace(',', '.')),
+                parseFloat(p.lng.toString().replace(',', '.'))
+            ]);
+
+            polyline.setLatLngs(path);
+            map.fitBounds(polyline.getBounds());
+            movingMarker.setLatLng(path[0]);
+
+        } catch (err) {
+            console.error("Hata:", err);
+            alert("Sistem hatası: Veriler alınamadı.");
+        }
+    }
+
+    // Oynatma Fonksiyonu
+    function startPlayback() {
+        if (gpsData.length === 0) return;
+
+        const speed = parseInt(document.getElementById('speedSelect').value);
+        document.getElementById('btnStart').disabled = true;
+
+        timer = setInterval(() => {
+            if (currentIndex >= gpsData.length) {
+                stopPlayback();
+                currentIndex = 0;
+                return;
+            }
+
+            const currentPoint = gpsData[currentIndex];
+            const pos = [
+                parseFloat(currentPoint.lat.toString().replace(',', '.')),
+                parseFloat(currentPoint.lng.toString().replace(',', '.'))
+            ];
+
+            movingMarker.setLatLng(pos);
+            movingMarker.bindPopup(`🕒 Saat: ${currentPoint.time}`).openPopup();
+
+            // Opsiyonel: Haritayı marker ile hareket ettir
+            // map.panTo(pos);
+
+            currentIndex++;
+        }, speed);
+    }
+
+    function stopPlayback() {
+        clearInterval(timer);
+        document.getElementById('btnStart').disabled = false;
+    }
+</script>
