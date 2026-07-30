@@ -6,8 +6,11 @@
     <link href="~/map/leaflet.css" rel="stylesheet" />
     <script src="~/map/chart.js"></script>
     <script src="~/map/leaflet.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+    @* <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" /> *@
+    @* <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script> *@
+    <script src="~/map/leaflet.draw.js"></script>
+
+    <!-- Dolly Kartları Listesi -->
     <div class="row">
         @foreach (var dolly in Model.DollyList)
         {
@@ -50,24 +53,51 @@
         }
     </div>
 
+    <!-- Dolly Detay Modal -->
     <div class="modal fade text-start" id="xlargeModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered modal-xl">
             <div class="modal-content">
-                <div class="modal-header">
-                    <h4 class="modal-title">Dolly Detay: <span id="modalDolyName" class="text-primary"></span></h4>
+                <div class="modal-header d-flex justify-content-between align-items-center">
+                    <h4 class="modal-title mb-0">Dolly Detay: <span id="modalDolyName" class="text-primary"></span></h4>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <div class="row mb-2">
-                        <div class="col-md-3"><b>Seri No:</b> <span id="modalDolySerial"></span></div>
-                        <div class="col-md-3">
-                            <div class="form-check form-switch">
+
+                    <!-- Modal İçi Bilgiler ve Excel Filtre Barı -->
+                    <div class="row align-items-center mb-3 bg-light p-2 rounded">
+                        <div class="col-md-2">
+                            <b>Seri No:</b> <span id="modalDolySerial"></span>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="form-check form-switch mb-0">
                                 <input type="checkbox" class="form-check-input" id="modalDoluBosCheck" disabled style="opacity: 1;">
                                 <label class="form-check-label"><b>Boş/Dolu</b></label>
                             </div>
                         </div>
+                        <div class="col-md-8">
+                            <!-- Excel Rapor Filtre Formu (Modal İçi) -->
+                            <form action="/Home/ExportToExcel" method="get" class="row gx-2 align-items-center justify-content-end">
+                                <input type="hidden" name="dollyId" id="modalDollyIdInput" value="" />
+
+                                <div class="col-auto">
+                                    <label class="form-label mb-0 small fw-bold">Başlangıç:</label>
+                                    <input type="date" name="startDate" class="form-control form-control-sm" value="@DateTime.Now.AddDays(-7).ToString("yyyy-MM-dd")" required />
+                                </div>
+                                <div class="col-auto">
+                                    <label class="form-label mb-0 small fw-bold">Bitiş:</label>
+                                    <input type="date" name="endDate" class="form-control form-control-sm" value="@DateTime.Now.ToString("yyyy-MM-dd")" required />
+                                </div>
+                                <div class="col-auto">
+                                    <label class="form-label d-block mb-0 small">&nbsp;</label>
+                                    <button type="submit" class="btn btn-success btn-sm">
+                                        <i class="me-1">📊</i> Excel Raporu İndir
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
                     </div>
 
+                    <!-- Grafikler ve Harita -->
                     <div class="row">
                         <div class="col-md-4">
                             <div class="card shadow-none border">
@@ -94,6 +124,7 @@
                             </div>
                         </div>
                     </div>
+
                 </div>
             </div>
         </div>
@@ -105,12 +136,14 @@
     const allHumidities = @Html.Raw(JsonConvert.SerializeObject(Model.nem)) || [];
 
     let map, marker, tempChart, humChart;
+
     delete L.Icon.Default.prototype._getIconUrl;
-        L.Icon.Default.mergeOptions({
-            iconRetinaUrl: '/map/marker-icon-2x.png',
-    iconUrl: '/map/marker-icon.png',
-    shadowUrl: '/map/marker-shadow.png',
-        })
+    L.Icon.Default.mergeOptions({
+        iconRetinaUrl: '/map/marker-icon-2x.png',
+        iconUrl: '/map/marker-icon.png',
+        shadowUrl: '/map/marker-shadow.png',
+    });
+
     document.addEventListener("DOMContentLoaded", function () {
         const chartOptions = {
             responsive: true,
@@ -141,9 +174,13 @@
                 const lngStr = this.getAttribute('data-lng');
                 const status = this.getAttribute('data-status') === "true";
 
+                // Modal Elemanlarını Doldur
                 document.getElementById('modalDolyName').innerText = name;
                 document.getElementById('modalDolySerial').innerText = serial;
                 document.getElementById('modalDoluBosCheck').checked = status;
+
+                // Modal İçindeki Excel Formuna Aktif Dolly ID'sini Yaz
+                document.getElementById('modalDollyIdInput').value = id;
 
                 const modalEl = document.getElementById('xlargeModal');
                 modalEl.setAttribute('data-current-id', id);
@@ -162,32 +199,28 @@
             const fTemps = allTemps.filter(x => (x.DollyId || x.dollyId) === id).slice(-15);
             const fHums = allHumidities.filter(x => (x.DollyId || x.dollyId) === id).slice(-15);
 
-                tempChart.data.labels = fTemps.map(x => {
-        const d = new Date(x.Time || x.time);
-        if (isNaN(d)) return "";
-        // UTC metodlarını kullanarak tarayıcının +3 eklemesini engelliyoruz
-        const hours = d.getUTCHours().toString().padStart(2, '0');
-        const minutes = d.getUTCMinutes().toString().padStart(2, '0');
-        return `${hours}:${minutes}`;
-    });
+            tempChart.data.labels = fTemps.map(x => {
+                const d = new Date(x.Time || x.time);
+                if (isNaN(d)) return "";
+                const hours = d.getUTCHours().toString().padStart(2, '0');
+                const minutes = d.getUTCMinutes().toString().padStart(2, '0');
+                return `${hours}:${minutes}`;
+            });
             tempChart.data.datasets[0].data = fTemps.map(x => x.Sicaklik1 ?? x.sicaklik1);
             tempChart.update();
 
-                humChart.data.labels = fHums.map(x => {
-        const d = new Date(x.Time || x.time);
-        if (isNaN(d)) return "";
-
-        // Tarayıcının +3 eklemesini engellemek için UTC saatini alıyoruz
-        const hours = d.getUTCHours().toString().padStart(2, '0');
-        const minutes = d.getUTCMinutes().toString().padStart(2, '0');
-
-        return `${hours}:${minutes}`;
-    });
+            humChart.data.labels = fHums.map(x => {
+                const d = new Date(x.Time || x.time);
+                if (isNaN(d)) return "";
+                const hours = d.getUTCHours().toString().padStart(2, '0');
+                const minutes = d.getUTCMinutes().toString().padStart(2, '0');
+                return `${hours}:${minutes}`;
+            });
             humChart.data.datasets[0].data = fHums.map(x => x.Nem1 ?? x.nem1);
             humChart.update();
 
-                // 2. HARİTAYI GÜNCELLE
-    setTimeout(() => {
+            // 2. HARİTAYI GÜNCELLE
+                  setTimeout(() => {
         let rawLat = modalEl.getAttribute('data-current-lat');
         let rawLng = modalEl.getAttribute('data-current-lng');
 
@@ -206,38 +239,57 @@
         if (!isNaN(lat) && !isNaN(lng)) {
             if (map) { map.remove(); map = null; }
 
-            map = L.map('basic-map').setView([lat, lng], 15);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '© OpenStreetMap'
+            // Genişletilmiş Harita Sınırları
+            const mapTileBounds = L.latLngBounds(
+                L.latLng(41.1800, 28.6200),
+                L.latLng(41.3600, 28.8500)
+            );
+
+            map = L.map('basic-map', {
+                center: [lat, lng],
+                zoom: 14,
+                minZoom: 12,
+                maxZoom: 16,
+                maxBounds: mapTileBounds,
+                maxBoundsViscosity: 0.8
+            });
+
+            L.tileLayer('/map/files/{z}/{x}/{y}png.tile', {
+                minZoom: 12,
+                maxZoom: 16,
+                attribution: 'Offline Harita'
             }).addTo(map);
 
+            // Marker oluşturma
             marker = L.marker([lat, lng]).addTo(map);
 
-            // --- ALAN KONTROLÜ EKLEMESİ (STATİK) ---
+            // --- KOORDİNAT BİLGİSİ EKLEME ---
+            const popupText = `<b>Konum Koordinatları:</b><br>Lat: ${lat}<br>Lng: ${lng}`;
 
-            // 1. İzin verilen alanı tanımla (Örn: Mevcut konumun biraz çevresi)
-            // [GüneyBatıLat, GüneyBatıLng], [KuzeyDoğuLat, KuzeyDoğuLng]
-            const bounds = [
+            // 1. İğneye tıklayınca açılan baloncuk (Popup)
+            marker.bindPopup(popupText);
+
+            // 2. İğnenin üstünde/yanında sürekli görünen etiket (Tooltip)
+            marker.bindTooltip(`<b>${lat.toFixed(5)}, ${lng.toFixed(5)}</b>`, {
+                permanent: true,     // Tıklamaya gerek kalmadan sürekli açık kalır
+                direction: 'top',    // İğnenin hemen üstünde konumlanır
+                offset: [0, -32]     // İğne görselinin tam tepesine hizalar
+            }).openTooltip();
+
+            // --- ALAN KONTROLÜ (GEOFENCE) ---
+            const bounds = L.latLngBounds([
                 [lat - 0.01, lng - 0.01],
                 [lat + 0.01, lng + 0.01]
-            ];
+            ]);
 
-            // 2. Alanı haritaya çiz (Görsel test için kırmızı dikdörtgen)
-            const zone = L.rectangle(bounds, {color: "red", weight: 1}).addTo(map);
-
-            // 3. Kontrolü yap
             const currentLatLng = L.latLng(lat, lng);
 
-            if (!zone.getBounds().contains(currentLatLng)) {
-                // Eğer konum alanın dışındaysa uyarı ver
+            if (!bounds.contains(currentLatLng)) {
                 alert("⚠️ UYARI: Belirlenen güvenli alanın dışındasınız!");
-
-                // İsterseniz marker rengini değiştirebilir veya haritayı kırmızı yapabilirsiniz
-                marker.bindPopup("<b style='color:red;'>Alan Dışı Konum!</b>").openPopup();
+                marker.bindPopup(`<b style='color:red;'>Alan Dışı Konum!</b><br>Lat: ${lat}<br>Lng: ${lng}`).openPopup();
             } else {
                 console.log("Konum güvenli alan içerisinde.");
             }
-
             // --- ALAN KONTROLÜ SONU ---
 
             setTimeout(() => { map.invalidateSize(); }, 200);
@@ -245,7 +297,8 @@
     }, 300);
         });
     });
-        setInterval(function () {
+
+    setInterval(function () {
         window.location.reload();
     }, 30000);
 </script>

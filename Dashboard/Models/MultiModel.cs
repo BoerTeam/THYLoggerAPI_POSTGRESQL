@@ -1,4 +1,5 @@
-﻿using THYLoggerAPI_POSTGRESQL.Model;
+﻿using Dashboard.DTO;
+
 
 namespace Dashboard.Models
 {

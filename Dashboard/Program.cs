@@ -1,4 +1,5 @@
 using System.Xml;
+using Microsoft.AspNetCore.StaticFiles; // 1. EKLENDÝ: Static files provider için gerekli
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -16,7 +17,15 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-app.UseStaticFiles();
+
+// 2. GÜNCELLENDÝ: .tile uzantýsýný .NET'in tanýmasý için MIME ayarý eklendi
+var provider = new FileExtensionContentTypeProvider();
+provider.Mappings[".tile"] = "image/png";
+
+app.UseStaticFiles(new StaticFileOptions
+{
+    ContentTypeProvider = provider
+});
 
 app.UseRouting();
 
@@ -27,10 +36,9 @@ app.MapControllerRoute(
     pattern: "{controller=Home}/{action=Login}/{id?}");
 
 app.Run();
+
 public partial class Program
 {
-
-
     public static string Service_Link = "";
     private static void readConfig()
     {

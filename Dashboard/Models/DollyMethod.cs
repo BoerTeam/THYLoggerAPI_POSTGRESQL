@@ -1,4 +1,5 @@
-﻿using Newtonsoft.Json;
+﻿using Dashboard.DTO;
+using Newtonsoft.Json;
 using RestSharp;
 
 namespace Dashboard.Models
@@ -6,7 +7,7 @@ namespace Dashboard.Models
     public class DollyMethod
     {
         
-        public static List<THYLoggerAPI_POSTGRESQL.Model.Dolly> GetAllDolly()
+        public static List<Dolly> GetAllDolly()
         {
             try
             {
@@ -19,16 +20,16 @@ namespace Dashboard.Models
                 if (response.IsSuccessful && !string.IsNullOrEmpty(response.Content))
                 {
                     // Dolly tablosunda Time (zaman) alanı yoksa döngüye gerek kalmaz
-                    return JsonConvert.DeserializeObject<List<THYLoggerAPI_POSTGRESQL.Model.Dolly>>(response.Content);
+                    return JsonConvert.DeserializeObject<List<Dolly>>(response.Content);
                 }
-                return new List<THYLoggerAPI_POSTGRESQL.Model.Dolly>();
+                return new List<Dolly>();
             }
             catch (Exception)
             {
-                return new List<THYLoggerAPI_POSTGRESQL.Model.Dolly>();
+                return new List<Dolly>();
             }
         }
-        public static THYLoggerAPI_POSTGRESQL.Model.Dolly GetDollyById(int id)
+        public static Dolly GetDollyById(int id)
         {
             try
             {
@@ -42,7 +43,7 @@ namespace Dashboard.Models
                 if (response.IsSuccessful && !string.IsNullOrEmpty(response.Content))
                 {
                     // Tek bir nesne döneceği için List yerine direkt Model tipine deserialize ediyoruz
-                    return JsonConvert.DeserializeObject<THYLoggerAPI_POSTGRESQL.Model.Dolly>(response.Content);
+                    return JsonConvert.DeserializeObject<Dolly>(response.Content);
                 }
 
                 return null;
@@ -53,7 +54,7 @@ namespace Dashboard.Models
                 return null;
             }
         }
-        public static bool UpdateDolly(THYLoggerAPI_POSTGRESQL.Model.Dolly dolly)
+        public static bool UpdateDolly(Dolly dolly)
         {
             try
             {
@@ -83,7 +84,7 @@ namespace Dashboard.Models
                 return false;
             }
         }
-        public static async Task<bool> AddDolly(THYLoggerAPI_POSTGRESQL.Model.Dolly dolly)
+        public static async Task<bool> AddDolly(Dolly dolly)
         {
             try
             {

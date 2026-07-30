@@ -10,15 +10,17 @@ namespace THYLoggerAPI_POSTGRESQL.Controllers
     public class DoluBosController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
-        public DoluBosController(ApplicationDbContext context)
+        private readonly ILogger<DoluBosController> _logger;
+        public DoluBosController(ApplicationDbContext context, ILogger<DoluBosController> logger)
         {
             _context = context;
+            _logger = logger;
         }
         [HttpGet("Get")]
         public IEnumerable<BosDolu> Get()
         {
-            
-                return _context.BosDolu.OrderBy(i => i.Id).ToList();
+            _logger.LogInformation("Tüm Dolly verileri listeleniyor.");
+            return _context.BosDolu.OrderBy(i => i.Id).ToList();
             
         }
 

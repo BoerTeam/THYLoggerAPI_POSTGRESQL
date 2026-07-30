@@ -1,9 +1,10 @@
-﻿using Dashboard.Models;
+﻿using Dashboard.DTO;
+using Dashboard.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using System.Net.Http;
-using THYLoggerAPI_POSTGRESQL.Model;
+
 
 namespace Dashboard.Controllers
 {

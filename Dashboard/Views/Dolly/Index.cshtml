@@ -109,15 +109,35 @@
     @* <script src="https://cdn.jsdelivr.net/npm/chart.js"></script> *@
     <script src="~/map/chart.js"></script>
     <script>
-                delete L.Icon.Default.prototype._getIconUrl;
+        delete L.Icon.Default.prototype._getIconUrl;
         L.Icon.Default.mergeOptions({
             iconRetinaUrl: '/map/marker-icon-2x.png',
             iconUrl: '/map/marker-icon.png',
             shadowUrl: '/map/marker-shadow.png',
         });
-        // 1. Harita Kurulumu
-        const map = L.map('map').setView([41.2761, 28.7287], 13);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
+
+        // Offline Harita Sınırları (MOBAC ile indirdiğiniz genişletilmiş alan)
+        const mapTileBounds = L.latLngBounds(
+            L.latLng(41.1800, 28.6200), // Güney-Batı
+            L.latLng(41.3600, 28.8500)  // Kuzey-Doğu
+        );
+
+        // 1. Offline Harita Kurulumu
+        const map = L.map('map', {
+            center: [41.2761, 28.7287], // İstanbul Havalimanı
+            zoom: 14,
+            minZoom: 14,
+            maxZoom: 16,
+            maxBounds: mapTileBounds,     // Taşmayı engeller
+            maxBoundsViscosity: 0.8
+        });
+
+        // Offline Tile Layer
+        L.tileLayer('/map/files/{z}/{x}/{y}png.tile', {
+            minZoom: 12,
+            maxZoom: 16,
+            attribution: 'Offline Harita'
+        }).addTo(map);
 
         // 2. Dinamik Geofence Ayarları (Geoman)
         map.pm.addControls({
@@ -132,7 +152,7 @@
             removalMode: true
         });
 
-                let areaCoords = [
+        let areaCoords = [
             [41.2850, 28.7050], [41.2950, 28.7450], [41.2650, 28.7550],
             [41.2550, 28.7150], [41.2850, 28.7050]
         ];
@@ -141,24 +161,23 @@
             color: '#27ae60', weight: 2, fillOpacity: 0.1, dashArray: '5, 5'
         }).addTo(map);
 
-        // Turf.js için aktif poligon nesnesi
+        // Turf.js için aktif poligon nesnesi [lng, lat]
         let turfFence = turf.polygon([areaCoords.map(c => [c[1], c[0]])]);
 
-        // Kullanıcı alanı değiştirdiğinde Turf nesnesini güncelle
+        // Kullanıcı Geoman ile alanı değiştirdiğinde Turf nesnesini güncelle
         map.on('pm:create pm:edit pm:remove', function() {
             const layers = map.pm.getGeomanLayers();
             if(layers.length > 0) {
                 const lastLayer = layers[layers.length - 1];
                 const coords = lastLayer.getLatLngs()[0];
                 const turfFormat = coords.map(c => [c.lng, c.lat]);
-                turfFormat.push(turfFormat[0]); // Kapat
+                turfFormat.push(turfFormat[0]); // Poligonu kapat
                 turfFence = turf.polygon([turfFormat]);
                 console.log("Geofence güncellendi.");
             }
         });
 
-        // 3. İzlenecek Nesneler (Simülasyon Verisi)
-                  // 3. İzlenecek Nesneler (10 Adet Simülasyon Verisi)
+        // 3. İzlenecek Nesneler (10 Adet Simülasyon Verisi)
         const objects = [
             { id: 1, name: "Dolly 01", coords: [41.2765, 28.7290], path: [], color: '#3498db' },
             { id: 2, name: "Dolly 02", coords: [41.2780, 28.7310], path: [], color: '#9b59b6' },
@@ -172,33 +191,27 @@
             { id: 10, name: "Güvenlik Aracı", coords: [41.2795, 28.7150], path: [], color: '#2980b9' }
         ];
 
-        // Marker ve Polyline'ları haritaya ekle
+        // Marker, Tooltip ve Polyline'ları haritaya ekle
         objects.forEach(obj => {
             obj.marker = L.marker(obj.coords).addTo(map).bindPopup(obj.name);
+
+            // Araç adını ve canlı koordinatını marker üstünde göster
+            obj.marker.bindTooltip(`<b>${obj.name}</b>`, {
+                permanent: true,
+                direction: 'top',
+                offset: [0, -32]
+            });
+
             obj.polyline = L.polyline([], { color: obj.color, weight: 3, opacity: 0.6 }).addTo(map);
         });
 
-        // 4. Grafik Kurulumu (Chart.js)
-        // const ctx = document.getElementById('telemetryChart').getContext('2d');
-        // const telemetryChart = new Chart(ctx, {
-        //     type: 'line',
-        //     data: {
-        //         labels: [],
-        //         datasets: [
-        //             { label: 'Sıcaklık (°C)', borderColor: '#e74c3c', data: [], tension: 0.3 },
-        //             { label: 'Nem (%)', borderColor: '#3498db', data: [], tension: 0.3 }
-        //         ]
-        //     },
-        //     options: { responsive: true, maintainAspectRatio: false }
-        // });
-
-        // 5. Ana Döngü (API'den veri çekme simülasyonu)
+        // 4. Ana Döngü (Canlı Takip & Geofence Kontrolü)
         function updateSystem() {
             let outCount = 0;
             let statusHTML = "";
 
             objects.forEach(obj => {
-                // Hareket Simülasyonu (Burada Fetch API kullanabilirsin)
+                // Hareket Simülasyonu
                 obj.coords[0] += (Math.random() - 0.5) * 0.001;
                 obj.coords[1] += (Math.random() - 0.5) * 0.001;
 
@@ -208,51 +221,44 @@
                 obj.marker.setLatLng(obj.coords);
                 obj.polyline.setLatLngs(obj.path);
 
-                // Geofence Kontrolü
+                // Geofence Kontrolü (Turf.js)
                 const pt = turf.point([obj.coords[1], obj.coords[0]]);
                 const isInside = turf.booleanPointInPolygon(pt, turfFence);
 
+                const markerEl = obj.marker.getElement();
+
                 if (!isInside) {
                     outCount++;
-                    obj.marker.getElement().style.filter = "hue-rotate(150deg)";
+                    if (markerEl) markerEl.style.filter = "hue-rotate(150deg) drop-shadow(0 0 5px red)";
                     obj.polyline.setStyle({ color: 'red' });
-                    statusHTML += `<div class="status-pill out-bounds">⚠️ ${obj.name} DIŞARIDA!</div><br>`;
+                    statusHTML += `<div class="status-pill out-bounds">⚠️ ${obj.name} DIŞARIDA! (${obj.coords[0].toFixed(4)}, ${obj.coords[1].toFixed(4)})</div><br>`;
                 } else {
-                    obj.marker.getElement().style.filter = "none";
-                    obj.polyline.setStyle({ color: '#3498db' });
+                    if (markerEl) markerEl.style.filter = "none";
+                    obj.polyline.setStyle({ color: obj.color });
                 }
             });
 
-            // Grafik Güncelleme (Rastgele Sensör Verisi)
-            // const now = new Date().toLocaleTimeString();
-            // telemetryChart.data.labels.push(now);
-            // telemetryChart.data.datasets[0].data.push((20 + Math.random() * 5).toFixed(1));
-            // telemetryChart.data.datasets[1].data.push((40 + Math.random() * 10).toFixed(1));
-
-            // if(telemetryChart.data.labels.length > 15) {
-            //     telemetryChart.data.labels.shift();
-            //     telemetryChart.data.datasets.forEach(d => d.data.shift());
-            // }
-            // telemetryChart.update('none');
-
-            document.getElementById('stats').innerHTML = `
-                <b>Durum:</b> ${outCount > 0 ? '⚠️ KRİTİK' : '✅ NORMAL'}<br>
-                <b>Aktif İhlal:</b> ${outCount}<br><hr>
-                ${statusHTML || 'Sınır ihlali yok.'}
-            `;
+            const statsEl = document.getElementById('stats');
+            if (statsEl) {
+                statsEl.innerHTML = `
+                    <b>Durum:</b> ${outCount > 0 ? '⚠️ KRİTİK' : '✅ NORMAL'}<br>
+                    <b>Aktif İhlal:</b> ${outCount}<br><hr>
+                    ${statusHTML || 'Sınır ihlali yok.'}
+                `;
+            }
         }
 
-        // Yeni alanı DB'ye kaydetmek için fonksiyon
+        // Geofence Kaydetme Fonksiyonu
         function saveNewGeofence() {
             const layers = map.pm.getGeomanLayers();
             if(layers.length > 0) {
                 const coords = layers[layers.length - 1].getLatLngs();
                 alert("Yeni Geofence Koordinatları Hazır!\nAPI'ye POST edilebilir.");
                 console.log(coords);
-                // Burada fetch('/api/save-geofence', { method: 'POST', body: JSON.stringify(coords) }) yapabilirsin.
             }
         }
 
+        // Her 2 saniyede bir konumu ve durumları güncelle
         setInterval(updateSystem, 2000);
     </script>
 

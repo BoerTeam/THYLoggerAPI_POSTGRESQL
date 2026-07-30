@@ -46,7 +46,7 @@ namespace THYLoggerAPI_POSTGRESQL.Data.Migrations
 
                     b.HasIndex("DollyId");
 
-                    b.ToTable("BosDolu");
+                    b.ToTable("BosDolu", (string)null);
                 });
 
             modelBuilder.Entity("THYLoggerAPI_POSTGRESQL.Model.Dolly", b =>
@@ -67,7 +67,7 @@ namespace THYLoggerAPI_POSTGRESQL.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Dolly");
+                    b.ToTable("Dolly", (string)null);
                 });
 
             modelBuilder.Entity("THYLoggerAPI_POSTGRESQL.Model.Gpsdatum", b =>
@@ -130,7 +130,7 @@ namespace THYLoggerAPI_POSTGRESQL.Data.Migrations
 
                     b.HasIndex("DollyId");
 
-                    b.ToTable("Gpsdatum");
+                    b.ToTable("Gpsdatum", (string)null);
                 });
 
             modelBuilder.Entity("THYLoggerAPI_POSTGRESQL.Model.Nem", b =>
@@ -154,7 +154,7 @@ namespace THYLoggerAPI_POSTGRESQL.Data.Migrations
 
                     b.HasIndex("DollyId");
 
-                    b.ToTable("Nem");
+                    b.ToTable("Nem", (string)null);
                 });
 
             modelBuilder.Entity("THYLoggerAPI_POSTGRESQL.Model.Sicaklik", b =>
@@ -178,7 +178,7 @@ namespace THYLoggerAPI_POSTGRESQL.Data.Migrations
 
                     b.HasIndex("DollyId");
 
-                    b.ToTable("Sicaklik");
+                    b.ToTable("Sicaklik", (string)null);
                 });
 
             modelBuilder.Entity("THYLoggerAPI_POSTGRESQL.Model.BosDolu", b =>

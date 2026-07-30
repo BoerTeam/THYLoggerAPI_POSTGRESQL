@@ -1,11 +1,12 @@
-﻿using Newtonsoft.Json;
+﻿using Dashboard.DTO;
+using Newtonsoft.Json;
 using RestSharp;
 
 namespace Dashboard.Models
 {
     public class DoluBosMethod
     {
-        public static List<THYLoggerAPI_POSTGRESQL.Model.BosDolu> GetAllDoluBosMethod()
+        public static List<BosDolu> GetAllDoluBosMethod()
         {
             try
             {
@@ -17,7 +18,7 @@ namespace Dashboard.Models
 
                 if (response.IsSuccessful && !string.IsNullOrEmpty(response.Content))
                 {
-                    var dataModel = JsonConvert.DeserializeObject<List<THYLoggerAPI_POSTGRESQL.Model.BosDolu>>(response.Content);
+                    var dataModel = JsonConvert.DeserializeObject<List<BosDolu>>(response.Content);
 
                     if (dataModel != null)
                     {
@@ -29,11 +30,11 @@ namespace Dashboard.Models
                     }
                     return dataModel;
                 }
-                return new List<THYLoggerAPI_POSTGRESQL.Model.BosDolu>();
+                return new List<BosDolu>();
             }
             catch (Exception)
             {
-                return new List<THYLoggerAPI_POSTGRESQL.Model.BosDolu>();
+                return new List<BosDolu>();
             }
         }
     }

@@ -1,11 +1,12 @@
-﻿using Newtonsoft.Json;
+﻿using Dashboard.DTO;
+using Newtonsoft.Json;
 using RestSharp;
 
 namespace Dashboard.Models
 {
     public class SicaklikMethod
     {
-        public static List<THYLoggerAPI_POSTGRESQL.Model.Sicaklik> GetAllSicaklikMethod()
+        public static List<Sicaklik> GetAllSicaklikMethod()
         {
             try
             {
@@ -18,7 +19,7 @@ namespace Dashboard.Models
 
                 if (response.IsSuccessful && !string.IsNullOrEmpty(response.Content))
                 {
-                    var dataModel = JsonConvert.DeserializeObject<List<THYLoggerAPI_POSTGRESQL.Model.Sicaklik>>(response.Content);
+                    var dataModel = JsonConvert.DeserializeObject<List<Sicaklik>>(response.Content);
 
                     if (dataModel != null)
                     {
@@ -31,11 +32,11 @@ namespace Dashboard.Models
                     return dataModel;
                 }
 
-                return new List<THYLoggerAPI_POSTGRESQL.Model.Sicaklik>();
+                return new List<Sicaklik>();
             }
             catch (Exception)
             {
-                return new List<THYLoggerAPI_POSTGRESQL.Model.Sicaklik>();
+                return new List<Sicaklik>();
             }
         } 
     } 

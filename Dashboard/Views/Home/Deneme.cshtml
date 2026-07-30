@@ -127,19 +127,40 @@
     let currentIndex = 0;
     let timer = null;
 
+    // Offline Harita Sınırları (MOBAC genişletilmiş alan koordinatlarınız)
+    const mapTileBounds = L.latLngBounds(
+        L.latLng(41.1800, 28.6200), // Güney-Batı
+        L.latLng(41.3600, 28.8500)  // Kuzey-Doğu
+    );
+
     // Harita Başlatma
     document.addEventListener("DOMContentLoaded", function () {
-        map = L.map('history-map').setView([41.2765, 28.7295], 14); // İstanbul Havalimanı
+        // 1. Offline Haritayı Tanımla
+        map = L.map('history-map', {
+            center: [41.2765, 28.7295], // İstanbul Havalimanı
+            zoom: 14,
+            minZoom: 14,
+            maxZoom: 16,
+            maxBounds: mapTileBounds,
+            maxBoundsViscosity: 0.8
+        });
+
+        // Icon yollarını ayarla
         delete L.Icon.Default.prototype._getIconUrl;
         L.Icon.Default.mergeOptions({
             iconRetinaUrl: '/map/marker-icon-2x.png',
-    iconUrl: '/map/marker-icon.png',
-    shadowUrl: '/map/marker-shadow.png',
-        })
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap'
+            iconUrl: '/map/marker-icon.png',
+            shadowUrl: '/map/marker-shadow.png',
+        });
+
+        // 2. Offline Tile Layer Bağlantısı
+        L.tileLayer('/map/files/{z}/{x}/{y}png.tile', {
+            minZoom: 12,
+            maxZoom: 16,
+            attribution: 'Offline Harita'
         }).addTo(map);
 
+        // Rota Çizgisi
         polyline = L.polyline([], {
             color: '#7367f0',
             weight: 4,
@@ -147,16 +168,16 @@
             dashArray: '5, 10'
         }).addTo(map);
 
+        // Hareketli İğne
         movingMarker = L.marker([0, 0]).addTo(map);
     });
 
     // Dinamik Veri Çekme (AJAX)
-        async function loadHistory() {
+    async function loadHistory() {
         const id = document.getElementById('dollySelect').value;
         const start = document.getElementById('startDate').value;
         const end = document.getElementById('endDate').value;
 
-        // Sadece Cihaz Seçimi Zorunlu
         if (!id) {
             alert("Lütfen bir Dolly seçiniz.");
             return;
@@ -166,10 +187,8 @@
         currentIndex = 0;
 
         try {
-            // URL'yi oluştururken tarihler boşsa boş string gider, C# tarafı null olarak yakalar
             const url = `/Home/GetHistoryData?id=${id}&start=${start}&end=${end}`;
 
-            // Yükleme sırasında kullanıcıya bilgi ver
             document.getElementById('controlsRow').style.display = 'flex';
             document.getElementById('txtPointCount').innerText = "Veriler getiriliyor...";
 
@@ -193,8 +212,21 @@
             ]);
 
             polyline.setLatLngs(path);
-            map.fitBounds(polyline.getBounds());
-            movingMarker.setLatLng(path[0]);
+            
+            // Çizilen rotaya haritayı sığdır ve görünürlüğü tazele
+            map.fitBounds(polyline.getBounds(), { padding: [20, 20] });
+            
+            // İlk konuma marker koy ve koordinat/saat etiketini ekle
+            const startPos = path[0];
+            movingMarker.setLatLng(startPos);
+            
+            movingMarker.bindTooltip(`🕒 Saat: ${gpsData[0].time}<br>Lat: ${startPos[0].toFixed(5)}, Lng: ${startPos[1].toFixed(5)}`, {
+                permanent: true,
+                direction: 'top',
+                offset: [0, -32]
+            }).openTooltip();
+
+            setTimeout(() => { map.invalidateSize(); }, 200);
 
         } catch (err) {
             console.error("Hata:", err);
@@ -223,10 +255,9 @@
             ];
 
             movingMarker.setLatLng(pos);
-            movingMarker.bindPopup(`🕒 Saat: ${currentPoint.time}`).openPopup();
-
-            // Opsiyonel: Haritayı marker ile hareket ettir
-            // map.panTo(pos);
+            
+            // Oynatma anında saat ve anlık koordinatı etiket olarak güncelle
+            movingMarker.setTooltipContent(`🕒 Saat: ${currentPoint.time}<br>Lat: ${pos[0].toFixed(5)}, Lng: ${pos[1].toFixed(5)}`);
 
             currentIndex++;
         }, speed);

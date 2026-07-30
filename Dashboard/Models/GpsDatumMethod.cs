@@ -1,11 +1,12 @@
-﻿using Newtonsoft.Json;
+﻿using Dashboard.DTO;
+using Newtonsoft.Json;
 using RestSharp;
 
 namespace Dashboard.Models
 {
     public class GpsDatumMethod
     {
-        public static List<THYLoggerAPI_POSTGRESQL.Model.Gpsdatum> GetAllGpsDatumMethod()
+        public static List<Gpsdatum> GetAllGpsDatumMethod()
         {
             try
             {
@@ -18,7 +19,7 @@ namespace Dashboard.Models
 
                 if (response.IsSuccessful && !string.IsNullOrEmpty(response.Content))
                 {
-                    var dataModel = JsonConvert.DeserializeObject<List<THYLoggerAPI_POSTGRESQL.Model.Gpsdatum>>(response.Content);
+                    var dataModel = JsonConvert.DeserializeObject<List<Gpsdatum>>(response.Content);
 
                     if (dataModel != null)
                     {
@@ -30,11 +31,11 @@ namespace Dashboard.Models
                     }
                     return dataModel;
                 }
-                return new List<THYLoggerAPI_POSTGRESQL.Model.Gpsdatum>();
+                return new List<Gpsdatum>();
             }
             catch (Exception)
             {
-                return new List<THYLoggerAPI_POSTGRESQL.Model.Gpsdatum>();
+                return new List<Gpsdatum>();
             }
         }
         public static List<GPSHistoryModel> GetHistoryData(int id, string start, string end)
