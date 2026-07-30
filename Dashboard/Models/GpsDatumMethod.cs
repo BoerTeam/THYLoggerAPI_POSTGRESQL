@@ -10,8 +10,9 @@ namespace Dashboard.Models
         {
             try
             {
+                string baseUrl = AppConfig.BaseUrl;
                 // Sabit URL (Sicaklik ile aynı mantık)
-                var client = new RestClient("https://localhost:44347/api/Gps/Get");
+                var client = new RestClient($"{baseUrl}/api/Gps/Get");
                 var request = new RestRequest();
                 request.Method = Method.Get;
 
@@ -42,8 +43,8 @@ namespace Dashboard.Models
         {
             try
             {
-                string baseUrl = "https://localhost:44347/api/Gps/GetHistoryData";
-                var client = new RestClient(baseUrl);
+                string baseUrl = AppConfig.BaseUrl;
+                var client = new RestClient($"{baseUrl}/api/Gps/GetHistoryData");
                 var request = new RestRequest();
                 request.Method = Method.Get;
 

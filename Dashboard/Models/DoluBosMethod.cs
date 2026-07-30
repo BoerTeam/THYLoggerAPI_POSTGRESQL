@@ -10,7 +10,8 @@ namespace Dashboard.Models
         {
             try
             {
-                var client = new RestClient("https://localhost:44347/api/DoluBos/Get");
+                string baseUrl = AppConfig.BaseUrl;
+                var client = new RestClient($"{baseUrl}/api/DoluBos/Get");
                 var request = new RestRequest();
                 request.Method = Method.Get;
 

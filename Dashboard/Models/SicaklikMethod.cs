@@ -10,8 +10,9 @@ namespace Dashboard.Models
         {
             try
             {
+                string baseUrl = AppConfig.BaseUrl;
                 // Link birleştirme hatasını önlemek için Trim kullanıyoruz
-                var client = new RestClient("https://localhost:44347/api/Sicaklik");
+                var client = new RestClient($"{baseUrl}/api/Sicaklik");
                 var request = new RestRequest();
                 request.Method = Method.Get;
 

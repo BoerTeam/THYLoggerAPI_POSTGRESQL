@@ -1,4 +1,5 @@
 ﻿using Dashboard.DTO;
+using DocumentFormat.OpenXml.Office2010.Excel;
 using Newtonsoft.Json;
 using RestSharp;
 
@@ -11,7 +12,8 @@ namespace Dashboard.Models
         {
             try
             {
-                var client = new RestClient("https://localhost:44347/api/Dolly/Get");
+                string baseUrl = AppConfig.BaseUrl;
+                var client = new RestClient($"{baseUrl}/api/Dolly/Get");
                 var request = new RestRequest();
                 request.Method = Method.Get;
 
@@ -33,8 +35,9 @@ namespace Dashboard.Models
         {
             try
             {
+                string baseUrl = AppConfig.BaseUrl;
                 // API'deki GetById endpoint adresin (ID'yi URL'ye ekliyoruz)
-                var client = new RestClient($"https://localhost:44347/api/Dolly/GetById/{id}");
+                var client = new RestClient($"{baseUrl}/api/Dolly/GetById/{id}");
                 var request = new RestRequest();
                 request.Method = Method.Get;
 
@@ -58,8 +61,9 @@ namespace Dashboard.Models
         {
             try
             {
+                string baseUrl = AppConfig.BaseUrl;
                 // API'deki Update endpoint adresin
-                var client = new RestClient("https://localhost:44347/api/Dolly/Update");
+                var client = new RestClient($"{baseUrl}/api/Dolly/Update");
                 var request = new RestRequest();
 
                 // Güncelleme için PUT metodu kullanılır (API'n POST bekliyorsa Method.Post yapabilirsin)
@@ -88,7 +92,8 @@ namespace Dashboard.Models
         {
             try
             {
-                var client = new RestClient("https://localhost:44347/api/Dolly/Add");
+                string baseUrl = AppConfig.BaseUrl;
+                var client = new RestClient($"{baseUrl}/api/Dolly/Add");
                 var request = new RestRequest();
                 request.Method = Method.Post; // Ekleme için POST
                 request.AddJsonBody(dolly);

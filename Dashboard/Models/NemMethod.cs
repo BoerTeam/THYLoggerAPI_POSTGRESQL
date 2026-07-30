@@ -10,8 +10,8 @@ namespace Dashboard.Models
         {
             try
             {
-                // Sabit URL (Sicaklik ile aynı mantık)
-                var client = new RestClient("httpss://localhost:44347/api/Nem/Get");
+                string baseUrl = AppConfig.BaseUrl;
+                var client = new RestClient($"{baseUrl}/api/Nem/Get");
                 var request = new RestRequest();
                 request.Method = Method.Get;
 

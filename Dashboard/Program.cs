@@ -1,11 +1,13 @@
-using System.Xml;
+using Dashboard.Models;
 using Microsoft.AspNetCore.StaticFiles; // 1. EKLENDÝ: Static files provider için gerekli
+using System.Xml;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
 builder.Services.AddHttpClient();
+AppConfig.Configuration = builder.Configuration;
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
