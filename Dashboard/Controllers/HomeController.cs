@@ -179,7 +179,7 @@ namespace Dashboard.Controllers
         public async Task<IActionResult> Login(string Username, string Password)
         {
             // Burada API'den veya DB'den doðrulama yapabilirsin
-            if (Username == "admin" && Password == "1234")
+            if (Username == "zkitapci" && Password == "7k#9P2x")
             {
                 // Basit bir örnek: Cookie Authentication eklenebilir
                 return RedirectToAction("Index", "Home");
