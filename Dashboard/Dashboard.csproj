@@ -38,6 +38,9 @@
   </ItemGroup>
   <ItemGroup>
     <Folder Include="wwwroot\app-assets\vendors\js\maps\" />
+    <Folder Include="wwwroot\lib\leaflet\" />
+    <Folder Include="wwwroot\lib\geoman\" />
+    <Folder Include="wwwroot\lib\turf\" />
     <Folder Include="wwwroot\map\files\" />
   </ItemGroup>
 

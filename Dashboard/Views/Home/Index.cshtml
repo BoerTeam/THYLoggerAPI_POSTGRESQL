@@ -3,13 +3,6 @@
 @using System.Globalization
 
 <section id="modal-examples">
-    <link href="~/map/leaflet.css" rel="stylesheet" />
-    <script src="~/map/chart.js"></script>
-    <script src="~/map/leaflet.js"></script>
-    @* <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" /> *@
-    @* <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script> *@
-    <script src="~/map/leaflet.draw.js"></script>
-
     <!-- Dolly Kartları Listesi -->
     <div class="row">
         @foreach (var dolly in Model.DollyList)
@@ -131,174 +124,173 @@
     </div>
 </section>
 
-<script>
-    const allTemps = @Html.Raw(JsonConvert.SerializeObject(Model.Sicaklik)) || [];
-    const allHumidities = @Html.Raw(JsonConvert.SerializeObject(Model.nem)) || [];
+@section Scripts {
+    <script>
+        const allTemps = @Html.Raw(JsonConvert.SerializeObject(Model.Sicaklik)) || [];
+        const allHumidities = @Html.Raw(JsonConvert.SerializeObject(Model.nem)) || [];
 
-    let map, marker, tempChart, humChart;
+        let map, marker, tempChart, humChart;
 
-    delete L.Icon.Default.prototype._getIconUrl;
-    L.Icon.Default.mergeOptions({
-        iconRetinaUrl: '/map/marker-icon-2x.png',
-        iconUrl: '/map/marker-icon.png',
-        shadowUrl: '/map/marker-shadow.png',
-    });
-
-    document.addEventListener("DOMContentLoaded", function () {
-        const chartOptions = {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: { y: { beginAtZero: false } }
-        };
-
-        // Grafik Kurulumları
-        tempChart = new Chart(document.getElementById('tempChart'), {
-            type: 'line',
-            data: { labels: [], datasets: [{ label: 'Sıcaklık (°C)', borderColor: '#ea5455', backgroundColor: 'rgba(234, 84, 85, 0.1)', data: [], fill: true, tension: 0.3 }] },
-            options: chartOptions
+        delete L.Icon.Default.prototype._getIconUrl;
+        L.Icon.Default.mergeOptions({
+            iconRetinaUrl: '/lib/leaflet/images/marker-icon-2x.png',
+            iconUrl: '/lib/leaflet/images/marker-icon.png',
+            shadowUrl: '/lib/leaflet/images/marker-shadow.png',
         });
 
-        humChart = new Chart(document.getElementById('humidityChart'), {
-            type: 'line',
-            data: { labels: [], datasets: [{ label: 'Nem (%)', borderColor: '#00cfe8', backgroundColor: 'rgba(0, 207, 232, 0.1)', data: [], fill: true, tension: 0.3 }] },
-            options: chartOptions
-        });
-
-        // Kartlara Tıklama Olayı
-        document.querySelectorAll('.doly-card').forEach(card => {
-            card.onclick = function () {
-                const id = parseInt(this.getAttribute('data-dolly-id'));
-                const name = this.getAttribute('data-doly-name');
-                const serial = this.getAttribute('data-doly-serial');
-                const latStr = this.getAttribute('data-lat');
-                const lngStr = this.getAttribute('data-lng');
-                const status = this.getAttribute('data-status') === "true";
-
-                // Modal Elemanlarını Doldur
-                document.getElementById('modalDolyName').innerText = name;
-                document.getElementById('modalDolySerial').innerText = serial;
-                document.getElementById('modalDoluBosCheck').checked = status;
-
-                // Modal İçindeki Excel Formuna Aktif Dolly ID'sini Yaz
-                document.getElementById('modalDollyIdInput').value = id;
-
-                const modalEl = document.getElementById('xlargeModal');
-                modalEl.setAttribute('data-current-id', id);
-                modalEl.setAttribute('data-current-lat', latStr);
-                modalEl.setAttribute('data-current-lng', lngStr);
-
-                bootstrap.Modal.getOrCreateInstance(modalEl).show();
+        document.addEventListener("DOMContentLoaded", function () {
+            const chartOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: { y: { beginAtZero: false } }
             };
+
+            // Grafik Kurulumları
+            tempChart = new Chart(document.getElementById('tempChart'), {
+                type: 'line',
+                data: { labels: [], datasets: [{ label: 'Sıcaklık (°C)', borderColor: '#ea5455', backgroundColor: 'rgba(234, 84, 85, 0.1)', data: [], fill: true, tension: 0.3 }] },
+                options: chartOptions
+            });
+
+            humChart = new Chart(document.getElementById('humidityChart'), {
+                type: 'line',
+                data: { labels: [], datasets: [{ label: 'Nem (%)', borderColor: '#00cfe8', backgroundColor: 'rgba(0, 207, 232, 0.1)', data: [], fill: true, tension: 0.3 }] },
+                options: chartOptions
+            });
+
+            // Kartlara Tıklama Olayı
+            document.querySelectorAll('.doly-card').forEach(card => {
+                card.onclick = function () {
+                    const id = parseInt(this.getAttribute('data-dolly-id'));
+                    const name = this.getAttribute('data-doly-name');
+                    const serial = this.getAttribute('data-doly-serial');
+                    const latStr = this.getAttribute('data-lat');
+                    const lngStr = this.getAttribute('data-lng');
+                    const status = this.getAttribute('data-status') === "true";
+
+                    // Modal Elemanlarını Doldur
+                    document.getElementById('modalDolyName').innerText = name;
+                    document.getElementById('modalDolySerial').innerText = serial;
+                    document.getElementById('modalDoluBosCheck').checked = status;
+
+                    // Modal İçindeki Excel Formuna Aktif Dolly ID'sini Yaz
+                    document.getElementById('modalDollyIdInput').value = id;
+
+                    const modalEl = document.getElementById('xlargeModal');
+                    modalEl.setAttribute('data-current-id', id);
+                    modalEl.setAttribute('data-current-lat', latStr);
+                    modalEl.setAttribute('data-current-lng', lngStr);
+
+                    bootstrap.Modal.getOrCreateInstance(modalEl).show();
+                };
+            });
+
+            const modalEl = document.getElementById('xlargeModal');
+            modalEl.addEventListener('shown.bs.modal', function () {
+                const id = parseInt(this.getAttribute('data-current-id'));
+
+                // 1. GRAFİKLERİ GÜNCELLE
+                const fTemps = allTemps.filter(x => (x.DollyId || x.dollyId) === id).slice(-15);
+                const fHums = allHumidities.filter(x => (x.DollyId || x.dollyId) === id).slice(-15);
+
+                tempChart.data.labels = fTemps.map(x => {
+                    const d = new Date(x.Time || x.time);
+                    if (isNaN(d)) return "";
+                    const hours = d.getUTCHours().toString().padStart(2, '0');
+                    const minutes = d.getUTCMinutes().toString().padStart(2, '0');
+                    return `${hours}:${minutes}`;
+                });
+                tempChart.data.datasets[0].data = fTemps.map(x => x.Sicaklik1 ?? x.sicaklik1);
+                tempChart.update();
+
+                humChart.data.labels = fHums.map(x => {
+                    const d = new Date(x.Time || x.time);
+                    if (isNaN(d)) return "";
+                    const hours = d.getUTCHours().toString().padStart(2, '0');
+                    const minutes = d.getUTCMinutes().toString().padStart(2, '0');
+                    return `${hours}:${minutes}`;
+                });
+                humChart.data.datasets[0].data = fHums.map(x => x.Nem1 ?? x.nem1);
+                humChart.update();
+
+                // 2. HARİTAYI GÜNCELLE
+                setTimeout(() => {
+                    let rawLat = modalEl.getAttribute('data-current-lat');
+                    let rawLng = modalEl.getAttribute('data-current-lng');
+
+                    if (!rawLat || !rawLng || rawLat === "0" || rawLat === "") {
+                        document.getElementById('basic-map').innerHTML =
+                            "<div style='display:flex; justify-content:center; align-items:center; height:100%; color:gray;'>Konum Bilgisi Mevcut Değil</div>";
+                        return;
+                    }
+
+                    let cleanLat = rawLat.trim().replace(/\s+/g, '.').replace(',', '.');
+                    let cleanLng = rawLng.trim().replace(/\s+/g, '.').replace(',', '.');
+
+                    const lat = parseFloat(cleanLat);
+                    const lng = parseFloat(cleanLng);
+
+                    if (!isNaN(lat) && !isNaN(lng)) {
+                        if (map) { map.remove(); map = null; }
+
+                        // Genişletilmiş Harita Sınırları
+                        const mapTileBounds = L.latLngBounds(
+                            L.latLng(41.1800, 28.6200),
+                            L.latLng(41.3600, 28.8500)
+                        );
+
+                        map = L.map('basic-map', {
+                            center: [lat, lng],
+                            zoom: 14,
+                            minZoom: 12,
+                            maxZoom: 16,
+                            maxBounds: mapTileBounds,
+                            maxBoundsViscosity: 0.8
+                        });
+
+                        L.tileLayer('/map/files/{z}/{x}/{y}png.tile', {
+                            minZoom: 12,
+                            maxZoom: 16,
+                            attribution: 'Offline Harita'
+                        }).addTo(map);
+
+                        // Marker oluşturma
+                        marker = L.marker([lat, lng]).addTo(map);
+
+                        // --- KOORDİNAT BİLGİSİ EKLEME ---
+                        const popupText = `<b>Konum Koordinatları:</b><br>Lat: ${lat}<br>Lng: ${lng}`;
+
+                        // 1. İğneye tıklayınca açılan baloncuk (Popup)
+                        marker.bindPopup(popupText);
+
+                        // 2. İğnenin üstünde/yanında sürekli görünen etiket (Tooltip)
+                        marker.bindTooltip(`<b>${lat.toFixed(5)}, ${lng.toFixed(5)}</b>`, {
+                            permanent: true,
+                            direction: 'top',
+                            offset: [0, -32]
+                        }).openTooltip();
+
+                        // --- ALAN KONTROLÜ (GEOFENCE) ---
+                        const bounds = L.latLngBounds([
+                            [lat - 0.01, lng - 0.01],
+                            [lat + 0.01, lng + 0.01]
+                        ]);
+
+                        const currentLatLng = L.latLng(lat, lng);
+
+                        if (!bounds.contains(currentLatLng)) {
+                            alert("⚠️ UYARI: Belirlenen güvenli alanın dışındasınız!");
+                            marker.bindPopup(`<b style='color:red;'>Alan Dışı Konum!</b><br>Lat: ${lat}<br>Lng: ${lng}`).openPopup();
+                        }
+
+                        setTimeout(() => { map.invalidateSize(); }, 200);
+                    }
+                }, 300);
+            });
         });
 
-        const modalEl = document.getElementById('xlargeModal');
-        modalEl.addEventListener('shown.bs.modal', function () {
-            const id = parseInt(this.getAttribute('data-current-id'));
-
-            // 1. GRAFİKLERİ GÜNCELLE
-            const fTemps = allTemps.filter(x => (x.DollyId || x.dollyId) === id).slice(-15);
-            const fHums = allHumidities.filter(x => (x.DollyId || x.dollyId) === id).slice(-15);
-
-            tempChart.data.labels = fTemps.map(x => {
-                const d = new Date(x.Time || x.time);
-                if (isNaN(d)) return "";
-                const hours = d.getUTCHours().toString().padStart(2, '0');
-                const minutes = d.getUTCMinutes().toString().padStart(2, '0');
-                return `${hours}:${minutes}`;
-            });
-            tempChart.data.datasets[0].data = fTemps.map(x => x.Sicaklik1 ?? x.sicaklik1);
-            tempChart.update();
-
-            humChart.data.labels = fHums.map(x => {
-                const d = new Date(x.Time || x.time);
-                if (isNaN(d)) return "";
-                const hours = d.getUTCHours().toString().padStart(2, '0');
-                const minutes = d.getUTCMinutes().toString().padStart(2, '0');
-                return `${hours}:${minutes}`;
-            });
-            humChart.data.datasets[0].data = fHums.map(x => x.Nem1 ?? x.nem1);
-            humChart.update();
-
-            // 2. HARİTAYI GÜNCELLE
-                  setTimeout(() => {
-        let rawLat = modalEl.getAttribute('data-current-lat');
-        let rawLng = modalEl.getAttribute('data-current-lng');
-
-        if (!rawLat || !rawLng || rawLat === "0" || rawLat === "") {
-            document.getElementById('basic-map').innerHTML =
-                "<div style='display:flex; justify-content:center; align-items:center; height:100%; color:gray;'>Konum Bilgisi Mevcut Değil</div>";
-            return;
-        }
-
-        let cleanLat = rawLat.trim().replace(/\s+/g, '.').replace(',', '.');
-        let cleanLng = rawLng.trim().replace(/\s+/g, '.').replace(',', '.');
-
-        const lat = parseFloat(cleanLat);
-        const lng = parseFloat(cleanLng);
-
-        if (!isNaN(lat) && !isNaN(lng)) {
-            if (map) { map.remove(); map = null; }
-
-            // Genişletilmiş Harita Sınırları
-            const mapTileBounds = L.latLngBounds(
-                L.latLng(41.1800, 28.6200),
-                L.latLng(41.3600, 28.8500)
-            );
-
-            map = L.map('basic-map', {
-                center: [lat, lng],
-                zoom: 14,
-                minZoom: 12,
-                maxZoom: 16,
-                maxBounds: mapTileBounds,
-                maxBoundsViscosity: 0.8
-            });
-
-            L.tileLayer('/map/files/{z}/{x}/{y}png.tile', {
-                minZoom: 12,
-                maxZoom: 16,
-                attribution: 'Offline Harita'
-            }).addTo(map);
-
-            // Marker oluşturma
-            marker = L.marker([lat, lng]).addTo(map);
-
-            // --- KOORDİNAT BİLGİSİ EKLEME ---
-            const popupText = `<b>Konum Koordinatları:</b><br>Lat: ${lat}<br>Lng: ${lng}`;
-
-            // 1. İğneye tıklayınca açılan baloncuk (Popup)
-            marker.bindPopup(popupText);
-
-            // 2. İğnenin üstünde/yanında sürekli görünen etiket (Tooltip)
-            marker.bindTooltip(`<b>${lat.toFixed(5)}, ${lng.toFixed(5)}</b>`, {
-                permanent: true,     // Tıklamaya gerek kalmadan sürekli açık kalır
-                direction: 'top',    // İğnenin hemen üstünde konumlanır
-                offset: [0, -32]     // İğne görselinin tam tepesine hizalar
-            }).openTooltip();
-
-            // --- ALAN KONTROLÜ (GEOFENCE) ---
-            const bounds = L.latLngBounds([
-                [lat - 0.01, lng - 0.01],
-                [lat + 0.01, lng + 0.01]
-            ]);
-
-            const currentLatLng = L.latLng(lat, lng);
-
-            if (!bounds.contains(currentLatLng)) {
-                alert("⚠️ UYARI: Belirlenen güvenli alanın dışındasınız!");
-                marker.bindPopup(`<b style='color:red;'>Alan Dışı Konum!</b><br>Lat: ${lat}<br>Lng: ${lng}`).openPopup();
-            } else {
-                console.log("Konum güvenli alan içerisinde.");
-            }
-            // --- ALAN KONTROLÜ SONU ---
-
-            setTimeout(() => { map.invalidateSize(); }, 200);
-        }
-    }, 300);
-        });
-    });
-
-    setInterval(function () {
-        window.location.reload();
-    }, 30000);
-</script>
+        setInterval(function () {
+            window.location.reload();
+        }, 30000);
+    </script>
+}

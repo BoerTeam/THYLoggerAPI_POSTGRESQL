@@ -6,7 +6,6 @@
 }
 
 <section id="dolly-history-page">
-    <link href="~/map/leaflet.css" rel="stylesheet" />
     <style>
         .history-card {
             border: none;
@@ -120,151 +119,152 @@
     </div>
 </section>
 
-<script src="~/map/leaflet.js"></script>
-<script>
-    let map, polyline, movingMarker;
-    let gpsData = [];
-    let currentIndex = 0;
-    let timer = null;
+@section Scripts {
+    <script>
+        let map, polyline, movingMarker;
+        let gpsData = [];
+        let currentIndex = 0;
+        let timer = null;
 
-    // Offline Harita Sınırları (MOBAC genişletilmiş alan koordinatlarınız)
-    const mapTileBounds = L.latLngBounds(
-        L.latLng(41.1800, 28.6200), // Güney-Batı
-        L.latLng(41.3600, 28.8500)  // Kuzey-Doğu
-    );
+        // Offline Harita Sınırları
+        const mapTileBounds = L.latLngBounds(
+            L.latLng(41.1800, 28.6200), // Güney-Batı
+            L.latLng(41.3600, 28.8500)  // Kuzey-Doğu
+        );
 
-    // Harita Başlatma
-    document.addEventListener("DOMContentLoaded", function () {
-        // 1. Offline Haritayı Tanımla
-        map = L.map('history-map', {
-            center: [41.2765, 28.7295], // İstanbul Havalimanı
-            zoom: 14,
-            minZoom: 14,
-            maxZoom: 16,
-            maxBounds: mapTileBounds,
-            maxBoundsViscosity: 0.8
+        // Harita Başlatma
+        document.addEventListener("DOMContentLoaded", function () {
+            // 1. Offline Haritayı Tanımla
+            map = L.map('history-map', {
+                center: [41.2765, 28.7295], // İstanbul Havalimanı
+                zoom: 14,
+                minZoom: 14,
+                maxZoom: 16,
+                maxBounds: mapTileBounds,
+                maxBoundsViscosity: 0.8
+            });
+
+            // Icon yollarını ayarla
+            delete L.Icon.Default.prototype._getIconUrl;
+            L.Icon.Default.mergeOptions({
+                iconRetinaUrl: '/lib/leaflet/images/marker-icon-2x.png',
+                iconUrl: '/lib/leaflet/images/marker-icon.png',
+                shadowUrl: '/lib/leaflet/images/marker-shadow.png',
+            });
+
+            // 2. Offline Tile Layer Bağlantısı
+            L.tileLayer('/map/files/{z}/{x}/{y}png.tile', {
+                minZoom: 12,
+                maxZoom: 16,
+                attribution: 'Offline Harita'
+            }).addTo(map);
+
+            // Rota Çizgisi
+            polyline = L.polyline([], {
+                color: '#7367f0',
+                weight: 4,
+                opacity: 0.7,
+                dashArray: '5, 10'
+            }).addTo(map);
+
+            // Hareketli İğne
+            movingMarker = L.marker([0, 0]).addTo(map);
         });
 
-        // Icon yollarını ayarla
-        delete L.Icon.Default.prototype._getIconUrl;
-        L.Icon.Default.mergeOptions({
-            iconRetinaUrl: '/map/marker-icon-2x.png',
-            iconUrl: '/map/marker-icon.png',
-            shadowUrl: '/map/marker-shadow.png',
-        });
+        // Dinamik Veri Çekme (AJAX)
+        async function loadHistory() {
+            const id = document.getElementById('dollySelect').value;
+            const start = document.getElementById('startDate').value;
+            const end = document.getElementById('endDate').value;
 
-        // 2. Offline Tile Layer Bağlantısı
-        L.tileLayer('/map/files/{z}/{x}/{y}png.tile', {
-            minZoom: 12,
-            maxZoom: 16,
-            attribution: 'Offline Harita'
-        }).addTo(map);
-
-        // Rota Çizgisi
-        polyline = L.polyline([], {
-            color: '#7367f0',
-            weight: 4,
-            opacity: 0.7,
-            dashArray: '5, 10'
-        }).addTo(map);
-
-        // Hareketli İğne
-        movingMarker = L.marker([0, 0]).addTo(map);
-    });
-
-    // Dinamik Veri Çekme (AJAX)
-    async function loadHistory() {
-        const id = document.getElementById('dollySelect').value;
-        const start = document.getElementById('startDate').value;
-        const end = document.getElementById('endDate').value;
-
-        if (!id) {
-            alert("Lütfen bir Dolly seçiniz.");
-            return;
-        }
-
-        stopPlayback();
-        currentIndex = 0;
-
-        try {
-            const url = `/Home/GetHistoryData?id=${id}&start=${start}&end=${end}`;
-
-            document.getElementById('controlsRow').style.display = 'flex';
-            document.getElementById('txtPointCount').innerText = "Veriler getiriliyor...";
-
-            const response = await fetch(url);
-            gpsData = await response.json();
-
-            if (!gpsData || gpsData.length === 0) {
-                alert("Kayıtlı hareket verisi bulunamadı.");
-                document.getElementById('controlsRow').style.display = 'none';
+            if (!id) {
+                alert("Lütfen bir Dolly seçiniz.");
                 return;
             }
 
-            // Arayüz Bilgileri
-            document.getElementById('txtDollyName').innerText = document.getElementById('dollySelect').options[document.getElementById('dollySelect').selectedIndex].text;
-            document.getElementById('txtPointCount').innerText = `${gpsData.length} Konum Noktası Listelendi`;
+            stopPlayback();
+            currentIndex = 0;
 
-            // Harita Çizimi
-            const path = gpsData.map(p => [
-                parseFloat(p.lat.toString().replace(',', '.')),
-                parseFloat(p.lng.toString().replace(',', '.'))
-            ]);
+            try {
+                const url = `/Home/GetHistoryData?id=${id}&start=${start}&end=${end}`;
 
-            polyline.setLatLngs(path);
-            
-            // Çizilen rotaya haritayı sığdır ve görünürlüğü tazele
-            map.fitBounds(polyline.getBounds(), { padding: [20, 20] });
-            
-            // İlk konuma marker koy ve koordinat/saat etiketini ekle
-            const startPos = path[0];
-            movingMarker.setLatLng(startPos);
-            
-            movingMarker.bindTooltip(`🕒 Saat: ${gpsData[0].time}<br>Lat: ${startPos[0].toFixed(5)}, Lng: ${startPos[1].toFixed(5)}`, {
-                permanent: true,
-                direction: 'top',
-                offset: [0, -32]
-            }).openTooltip();
+                document.getElementById('controlsRow').style.display = 'flex';
+                document.getElementById('txtPointCount').innerText = "Veriler getiriliyor...";
 
-            setTimeout(() => { map.invalidateSize(); }, 200);
+                const response = await fetch(url);
+                gpsData = await response.json();
 
-        } catch (err) {
-            console.error("Hata:", err);
-            alert("Sistem hatası: Veriler alınamadı.");
-        }
-    }
+                if (!gpsData || gpsData.length === 0) {
+                    alert("Kayıtlı hareket verisi bulunamadı.");
+                    document.getElementById('controlsRow').style.display = 'none';
+                    return;
+                }
 
-    // Oynatma Fonksiyonu
-    function startPlayback() {
-        if (gpsData.length === 0) return;
+                // Arayüz Bilgileri
+                document.getElementById('txtDollyName').innerText = document.getElementById('dollySelect').options[document.getElementById('dollySelect').selectedIndex].text;
+                document.getElementById('txtPointCount').innerText = `${gpsData.length} Konum Noktası Listelendi`;
 
-        const speed = parseInt(document.getElementById('speedSelect').value);
-        document.getElementById('btnStart').disabled = true;
+                // Harita Çizimi
+                const path = gpsData.map(p => [
+                    parseFloat(p.lat.toString().replace(',', '.')),
+                    parseFloat(p.lng.toString().replace(',', '.'))
+                ]);
 
-        timer = setInterval(() => {
-            if (currentIndex >= gpsData.length) {
-                stopPlayback();
-                currentIndex = 0;
-                return;
+                polyline.setLatLngs(path);
+
+                // Çizilen rotaya haritayı sığdır ve görünürlüğü tazele
+                map.fitBounds(polyline.getBounds(), { padding: [20, 20] });
+
+                // İlk konuma marker koy ve koordinat/saat etiketini ekle
+                const startPos = path[0];
+                movingMarker.setLatLng(startPos);
+
+                movingMarker.bindTooltip(`🕒 Saat: ${gpsData[0].time}<br>Lat: ${startPos[0].toFixed(5)}, Lng: ${startPos[1].toFixed(5)}`, {
+                    permanent: true,
+                    direction: 'top',
+                    offset: [0, -32]
+                }).openTooltip();
+
+                setTimeout(() => { map.invalidateSize(); }, 200);
+
+            } catch (err) {
+                console.error("Hata:", err);
+                alert("Sistem hatası: Veriler alınamadı.");
             }
+        }
 
-            const currentPoint = gpsData[currentIndex];
-            const pos = [
-                parseFloat(currentPoint.lat.toString().replace(',', '.')),
-                parseFloat(currentPoint.lng.toString().replace(',', '.'))
-            ];
+        // Oynatma Fonksiyonu
+        function startPlayback() {
+            if (gpsData.length === 0) return;
 
-            movingMarker.setLatLng(pos);
-            
-            // Oynatma anında saat ve anlık koordinatı etiket olarak güncelle
-            movingMarker.setTooltipContent(`🕒 Saat: ${currentPoint.time}<br>Lat: ${pos[0].toFixed(5)}, Lng: ${pos[1].toFixed(5)}`);
+            const speed = parseInt(document.getElementById('speedSelect').value);
+            document.getElementById('btnStart').disabled = true;
 
-            currentIndex++;
-        }, speed);
-    }
+            timer = setInterval(() => {
+                if (currentIndex >= gpsData.length) {
+                    stopPlayback();
+                    currentIndex = 0;
+                    return;
+                }
 
-    function stopPlayback() {
-        clearInterval(timer);
-        document.getElementById('btnStart').disabled = false;
-    }
-</script>
+                const currentPoint = gpsData[currentIndex];
+                const pos = [
+                    parseFloat(currentPoint.lat.toString().replace(',', '.')),
+                    parseFloat(currentPoint.lng.toString().replace(',', '.'))
+                ];
+
+                movingMarker.setLatLng(pos);
+
+                // Oynatma anında saat ve anlık koordinatı etiket olarak güncelle
+                movingMarker.setTooltipContent(`🕒 Saat: ${currentPoint.time}<br>Lat: ${pos[0].toFixed(5)}, Lng: ${pos[1].toFixed(5)}`);
+
+                currentIndex++;
+            }, speed);
+        }
+
+        function stopPlayback() {
+            clearInterval(timer);
+            document.getElementById('btnStart').disabled = false;
+        }
+    </script>
+}

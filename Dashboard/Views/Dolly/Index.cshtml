@@ -1,119 +1,102 @@
 ﻿@{
     Layout = "_Layout";
+    ViewData["Title"] = "Havalimanı Telemetri & Geofence Paneli";
 }
 
-<!DOCTYPE html>
-<html lang="tr">
-<head>
-    <meta charset="UTF-8">
-    <title>Havalimanı Telemetri & Geofence Paneli</title>
-    @* <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" /> *@
-    <link href="~/map/leaflet.css" rel="stylesheet" />
-    @* <link rel="stylesheet" href="https://unpkg.com/@@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.css" /> *@
-    <link href="~/map/leaflet-geoman.css" rel="stylesheet" />
-    <style>
-        #map {
-            height: 70vh;
-            width: 100%;
-            border-radius: 15px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-        }
+<style>
+    #map {
+        height: 70vh;
+        width: 100%;
+        border-radius: 15px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    }
 
-        body {
-            font-family: 'Segoe UI', Tahoma, sans-serif;
-            margin: 0;
-            padding: 15px;
-            background: #f0f2f5;
-        }
+    body {
+        font-family: 'Segoe UI', Tahoma, sans-serif;
+        margin: 0;
+        padding: 15px;
+        background: #f0f2f5;
+    }
 
-        .main-container {
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-        }
+    .main-container {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
 
-        .bottom-panel {
-            display: flex;
-            gap: 20px;
-            height: 25vh;
-        }
+    .bottom-panel {
+        display: flex;
+        gap: 20px;
+        height: 25vh;
+    }
 
-        .info-panel {
-            background: white;
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-            flex: 1;
-            overflow-y: auto;
-        }
+    .info-panel {
+        background: white;
+        padding: 20px;
+        border-radius: 12px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        flex: 1;
+        overflow-y: auto;
+    }
 
-        .chart-panel {
-            background: white;
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-            flex: 2;
-        }
+    .chart-panel {
+        background: white;
+        padding: 20px;
+        border-radius: 12px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        flex: 2;
+    }
 
-        .status-pill {
-            padding: 4px 10px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: bold;
-            display: inline-block;
-            margin: 2px;
-        }
+    .status-pill {
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: bold;
+        display: inline-block;
+        margin: 2px;
+    }
 
-        .out-bounds {
-            background: #fee2e2;
-            color: #991b1b;
-            border: 1px solid #f87171;
-        }
+    .out-bounds {
+        background: #fee2e2;
+        color: #991b1b;
+        border: 1px solid #f87171;
+    }
 
-        .save-btn {
-            background: #27ae60;
-            color: white;
-            border: none;
-            padding: 10px 15px;
-            border-radius: 5px;
-            cursor: pointer;
-            margin-top: 10px;
-            width: 100%;
-        }
-    </style>
-</head>
-<body>
+    .save-btn {
+        background: #27ae60;
+        color: white;
+        border: none;
+        padding: 10px 15px;
+        border-radius: 5px;
+        cursor: pointer;
+        margin-top: 10px;
+        width: 100%;
+    }
+</style>
 
-    <div class="main-container">
-        <div id="map"></div>
+<div class="main-container">
+    <div id="map"></div>
 
-        <div class="bottom-panel">
-            <div class="info-panel" id="panel">
-                <h3>📡 Sistem Durumu</h3>
-                <div id="stats">Veri bekleniyor...</div>
-                <button class="save-btn" onclick="saveNewGeofence()">Yeni Alanı Kaydet</button>
-            </div>
+    <div class="bottom-panel">
+        <div class="info-panel" id="panel">
+            <h3>📡 Sistem Durumu</h3>
+            <div id="stats">Veri bekleniyor...</div>
+            <button class="save-btn" onclick="saveNewGeofence()">Yeni Alanı Kaydet</button>
+        </div>
 
-            <div class="chart-panel">
-                @* <canvas id="telemetryChart"></canvas> *@
-            </div>
+        <div class="chart-panel">
+            @* <canvas id="telemetryChart"></canvas> *@
         </div>
     </div>
+</div>
 
-    @* <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script> *@
-    <script src="~/map/leaflet.js"></script>
-    @* <script src="https://unpkg.com/@@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.min.js"></script> *@
-    <script src="~/map/leaflet-geoman.min.js"></script>
-    @* <script src="https://unpkg.com/@@turf/turf@6/turf.min.js"></script> *@
-    <script src="~/map/turf.min.js"></script>
-    @* <script src="https://cdn.jsdelivr.net/npm/chart.js"></script> *@
-    <script src="~/map/chart.js"></script>
+@section Scripts {
     <script>
         delete L.Icon.Default.prototype._getIconUrl;
         L.Icon.Default.mergeOptions({
-            iconRetinaUrl: '/map/marker-icon-2x.png',
-            iconUrl: '/map/marker-icon.png',
-            shadowUrl: '/map/marker-shadow.png',
+            iconRetinaUrl: '/lib/leaflet/images/marker-icon-2x.png',
+            iconUrl: '/lib/leaflet/images/marker-icon.png',
+            shadowUrl: '/lib/leaflet/images/marker-shadow.png',
         });
 
         // Offline Harita Sınırları (MOBAC ile indirdiğiniz genişletilmiş alan)
@@ -261,6 +244,4 @@
         // Her 2 saniyede bir konumu ve durumları güncelle
         setInterval(updateSystem, 2000);
     </script>
-
-</body>
-</html>
+}
