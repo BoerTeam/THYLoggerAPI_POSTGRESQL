@@ -10,14 +10,17 @@ namespace THYLoggerAPI_POSTGRESQL.Controllers
     public class SicaklikController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
-        public SicaklikController(ApplicationDbContext context)
+        private readonly ILogger<SicaklikController> _logger;
+        public SicaklikController(ApplicationDbContext context, ILogger<SicaklikController> logger)
         {
             _context = context;
+            _logger = logger;
         }
         [HttpGet]
         public IEnumerable<Sicaklik> Get()
-        {          
-                return _context.Sicaklik.OrderBy(i => i.Id).ToList();            
+        {
+            _logger.LogInformation("Tüm Sicaklik verileri listeleniyor.");
+            return _context.Sicaklik.OrderBy(i => i.Id).ToList();            
         }
 
         [HttpPost("Add")]
@@ -33,6 +36,7 @@ namespace THYLoggerAPI_POSTGRESQL.Controllers
 
             if (dolly == null)
             {
+                _logger.LogError("'{SerialNumber}' seri numarasına sahip bir cihaz sistemde kayıtlı değil.", entity.SerialNumber);
                 return NotFound($"'{entity.SerialNumber}' seri numarasına sahip bir cihaz sistemde kayıtlı değil.");
             }
 
@@ -59,7 +63,7 @@ namespace THYLoggerAPI_POSTGRESQL.Controllers
 
             _context.Sicaklik.Add(entity);
             _context.SaveChanges();
-
+            _logger.LogInformation("Yeni Sicaklik verisi başarıyla eklendi. SerialNumber: {SerialNumber}", entity.SerialNumber);
             return Ok(new
             {
                 Status = "Başarılı",

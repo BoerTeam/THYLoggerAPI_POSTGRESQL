@@ -10,14 +10,16 @@ namespace THYLoggerAPI_POSTGRESQL.Controllers
     public class NemController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
-        public NemController(ApplicationDbContext context)
+        private readonly ILogger<NemController> _logger;
+        public NemController(ApplicationDbContext context, ILogger<NemController> logger)
         {
             _context = context;
+            _logger = logger;
         }
         [HttpGet("Get")]
         public IEnumerable<Nem> Get()
         {
-            
+            _logger.LogInformation("Tüm Nem verileri listeleniyor.");
                 return _context.Nem.OrderBy(i => i.Id).ToList();
             
         }
@@ -28,6 +30,7 @@ namespace THYLoggerAPI_POSTGRESQL.Controllers
             // 1. Veri kontrolü
             if (entity == null || string.IsNullOrEmpty(entity.SerialNumber))
             {
+                _logger.LogError("SerialNumber zorunludur.");
                 return BadRequest("SerialNumber zorunludur.");
             }
 
@@ -37,6 +40,7 @@ namespace THYLoggerAPI_POSTGRESQL.Controllers
 
             if (dolly == null)
             {
+                _logger.LogError("Seri numarası {SerialNumber} olan bir Dolly bulunamadı.", entity.SerialNumber);
                 return NotFound($"Seri numarası {entity.SerialNumber} olan bir Dolly bulunamadı.");
             }
 
@@ -66,6 +70,8 @@ namespace THYLoggerAPI_POSTGRESQL.Controllers
 
             _context.Nem.Add(entity);
             _context.SaveChanges();
+            
+            _logger.LogInformation("Yeni Nem verisi başarıyla eklendi. SerialNumber: {SerialNumber}", entity.SerialNumber);
 
             // Yanıt dönerken kaydedilen veriyi de gösteriyoruz
             return Ok(new
