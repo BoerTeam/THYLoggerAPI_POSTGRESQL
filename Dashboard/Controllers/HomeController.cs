@@ -2,6 +2,10 @@ using ClosedXML.Excel;
 using Dashboard.DTO;
 using Dashboard.Models;
 using DocumentFormat.OpenXml.InkML;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Diagnostics;
@@ -9,6 +13,7 @@ using System.Diagnostics;
 
 namespace Dashboard.Controllers
 {
+    [Authorize]
     public class HomeController : Controller
     {
         private readonly ILogger<HomeController> _logger;
@@ -31,20 +36,20 @@ namespace Dashboard.Controllers
         [HttpGet]
         public IActionResult ExportToExcel(int? dollyId, DateTime startDate, DateTime endDate)
         {
-            // 1. Tarih aralýðý sýnýrlarýný ayarlayalým
+            // 1. Tarih aralï¿½ï¿½ï¿½ sï¿½nï¿½rlarï¿½nï¿½ ayarlayalï¿½m
             var startUtc = DateTime.SpecifyKind(startDate, DateTimeKind.Utc);
             var endUtc = DateTime.SpecifyKind(endDate, DateTimeKind.Utc).AddDays(1).AddTicks(-1);
 
-            // 2. Verileri doðrudan sizin projenizdeki Method'lar üzerinden çekiyoruz
+            // 2. Verileri doï¿½rudan sizin projenizdeki Method'lar ï¿½zerinden ï¿½ekiyoruz
             var tumSicakliklar = Models.SicaklikMethod.GetAllSicaklikMethod() ?? new List<Sicaklik>();
             var tumNemler = Models.NemMethod.GetAllNemMethod() ?? new List<Nem>();
             var tumGpsler = Models.GpsDatumMethod.GetAllGpsDatumMethod() ?? new List<Gpsdatum>();
             var tumDollyler = Models.DollyMethod.GetAllDolly() ?? new List<Dolly>();
 
-            // Dolly Id - Name eþleþmesi için sözlük (Dictionary)
+            // Dolly Id - Name eï¿½leï¿½mesi iï¿½in sï¿½zlï¿½k (Dictionary)
             var dollyDict = tumDollyler.ToDictionary(x => x.Id, x => x.Name);
 
-            // 3. Çekilen listeleri verilen Filtrelere (DollyId ve Tarih) göre süzüyoruz
+            // 3. ï¿½ekilen listeleri verilen Filtrelere (DollyId ve Tarih) gï¿½re sï¿½zï¿½yoruz
             var filteredSicaklik = tumSicakliklar
                 .Where(x => (!dollyId.HasValue || x.DollyId == dollyId) && x.Time >= startUtc && x.Time <= endUtc)
                 .OrderByDescending(x => x.Time)
@@ -60,14 +65,14 @@ namespace Dashboard.Controllers
                 .OrderByDescending(x => x.Time)
                 .ToList();
 
-            // 4. Excel Dosyasý Oluþturma (ClosedXML)
+            // 4. Excel Dosyasï¿½ Oluï¿½turma (ClosedXML)
             using (var workbook = new XLWorkbook())
             {
-                // --- TAB 1: Sýcaklýk ---
-                var wsTemp = workbook.Worksheets.Add("Sýcaklýk Verileri");
-                wsTemp.Cell(1, 1).Value = "Dolly Adý";
+                // --- TAB 1: Sï¿½caklï¿½k ---
+                var wsTemp = workbook.Worksheets.Add("Sï¿½caklï¿½k Verileri");
+                wsTemp.Cell(1, 1).Value = "Dolly Adï¿½";
                 wsTemp.Cell(1, 2).Value = "Tarih / Saat";
-                wsTemp.Cell(1, 3).Value = "Sýcaklýk (°C)";
+                wsTemp.Cell(1, 3).Value = "Sï¿½caklï¿½k (ï¿½C)";
 
                 int row = 2;
                 foreach (var item in filteredSicaklik)
@@ -81,7 +86,7 @@ namespace Dashboard.Controllers
 
                 // --- TAB 2: Nem ---
                 var wsHum = workbook.Worksheets.Add("Nem Verileri");
-                wsHum.Cell(1, 1).Value = "Dolly Adý";
+                wsHum.Cell(1, 1).Value = "Dolly Adï¿½";
                 wsHum.Cell(1, 2).Value = "Tarih / Saat";
                 wsHum.Cell(1, 3).Value = "Nem (%)";
 
@@ -97,7 +102,7 @@ namespace Dashboard.Controllers
 
                 // --- TAB 3: GPS Konum ---
                 var wsGps = workbook.Worksheets.Add("GPS Konum Verileri");
-                wsGps.Cell(1, 1).Value = "Dolly Adý";
+                wsGps.Cell(1, 1).Value = "Dolly Adï¿½";
                 wsGps.Cell(1, 2).Value = "Tarih / Saat";
                 wsGps.Cell(1, 3).Value = "Enlem (Lat)";
                 wsGps.Cell(1, 4).Value = "Boylam (Lng)";
@@ -113,7 +118,7 @@ namespace Dashboard.Controllers
                 }
                 wsGps.Columns().AdjustToContents();
 
-                // 5. Dosyayý indirilebilir formatta döndürüyoruz
+                // 5. Dosyayï¿½ indirilebilir formatta dï¿½ndï¿½rï¿½yoruz
                 using (var stream = new MemoryStream())
                 {
                     workbook.SaveAs(stream);
@@ -146,7 +151,7 @@ namespace Dashboard.Controllers
         [HttpGet]
         public JsonResult GetLatestData(int id)
         {
-            // Belirli bir Dolly ID'sine ait en son kayýtlarý çekiyoruz
+            // Belirli bir Dolly ID'sine ait en son kayï¿½tlarï¿½ ï¿½ekiyoruz
             var sonSicaklik = Models.SicaklikMethod.GetAllSicaklikMethod()
                                 .Where(x => x.DollyId == id).OrderByDescending(x => x.Time).FirstOrDefault();
 
@@ -169,39 +174,57 @@ namespace Dashboard.Controllers
             });
         }
 
+        [AllowAnonymous]
         [HttpGet]
-        public IActionResult Login()
+        public IActionResult Login(string? returnUrl = null)
         {
-            return View();
-        }
-
-        [HttpPost]
-        public async Task<IActionResult> Login(string Username, string Password)
-        {
-            // Burada API'den veya DB'den doðrulama yapabilirsin
-            if (Username == "zkitapci" && Password == "7k#9P2x")
+            if (User.Identity?.IsAuthenticated == true)
             {
-                // Basit bir örnek: Cookie Authentication eklenebilir
                 return RedirectToAction("Index", "Home");
             }
 
-            ViewBag.Error = "Kullanýcý adý veya þifre hatalý!";
+            ViewData["ReturnUrl"] = string.IsNullOrWhiteSpace(returnUrl) ? Url.Action("Index", "Home") : returnUrl;
             return View();
+        }
+
+        [AllowAnonymous]
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public IActionResult Login(string? returnUrl = null)
+        {
+            var redirectUrl = Url.Action("Index", "Home") ?? "/";
+            if (!string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl))
+            {
+                redirectUrl = returnUrl;
+            }
+
+            return Challenge(
+                new AuthenticationProperties { RedirectUri = redirectUrl },
+                OpenIdConnectDefaults.AuthenticationScheme);
+        }
+
+        [HttpGet]
+        public IActionResult Logout()
+        {
+            return SignOut(
+                new AuthenticationProperties { RedirectUri = Url.Action("Login", "Home") },
+                CookieAuthenticationDefaults.AuthenticationScheme,
+                OpenIdConnectDefaults.AuthenticationScheme);
         }
 
         [HttpGet]
         public IActionResult GetHistoryData(int id, DateTime? start, DateTime? end)
         {
-            // Static metodu çaðýrýyoruz. 
-            // Tarihleri API'nin anlayacaðý ISO formatýna (yyyy-MM-ddTHH:mm:ss) çevirerek gönderiyoruz.
+            // Static metodu ï¿½aï¿½ï¿½rï¿½yoruz. 
+            // Tarihleri API'nin anlayacaï¿½ï¿½ ISO formatï¿½na (yyyy-MM-ddTHH:mm:ss) ï¿½evirerek gï¿½nderiyoruz.
             var data = Models.GpsDatumMethod.GetHistoryData(
                 id,
                 start?.ToString("yyyy-MM-ddTHH:mm:ss"),
                 end?.ToString("yyyy-MM-ddTHH:mm:ss")
             );
 
-            // API'den liste boþ gelse bile GetHistoryData metodun 'new List<GPSHistoryModel>()' döndüðü için 
-            // null hatasý almazsýn, boþ dizi [] döner.
+            // API'den liste boï¿½ gelse bile GetHistoryData metodun 'new List<GPSHistoryModel>()' dï¿½ndï¿½ï¿½ï¿½ iï¿½in 
+            // null hatasï¿½ almazsï¿½n, boï¿½ dizi [] dï¿½ner.
             return Json(data);
         }
     }
