@@ -1,5 +1,7 @@
 using Dashboard.Models;
-using Microsoft.AspNetCore.StaticFiles; // 1. EKLENDÝ: Static files provider için gerekli
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using Microsoft.AspNetCore.StaticFiles; // 1. EKLENDï¿½: Static files provider iï¿½in gerekli
 using System.Xml;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -7,6 +9,40 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.AddControllersWithViews();
 builder.Services.AddHttpClient();
+var oidcClientId = builder.Configuration["Authentication:Oidc:ClientId"];
+if (string.IsNullOrWhiteSpace(oidcClientId) || oidcClientId.StartsWith("<set-via-env:", StringComparison.Ordinal))
+{
+    throw new InvalidOperationException("Authentication:Oidc:ClientId must be configured for THY OIDC login.");
+}
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = OpenIdConnectDefaults.AuthenticationScheme;
+})
+.AddCookie(options =>
+{
+    options.LoginPath = "/Home/Login";
+})
+.AddOpenIdConnect(options =>
+{
+    options.SignInScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+    options.MetadataAddress = builder.Configuration["Authentication:Oidc:MetadataAddress"] ?? "https://oidctest.thy.com/idp/.well-known/openid-configurations";
+    options.ClientId = oidcClientId;
+    options.CallbackPath = builder.Configuration["Authentication:Oidc:CallbackPath"] ?? "/callback";
+    options.ResponseType = "code";
+    options.UsePkce = true;
+    options.SaveTokens = true;
+    options.GetClaimsFromUserInfoEndpoint = true;
+
+    options.Scope.Clear();
+    options.Scope.Add("openid");
+    options.Scope.Add("profile");
+    options.Scope.Add("email");
+});
+builder.Services.AddAuthorization(options =>
+{
+    options.FallbackPolicy = options.DefaultPolicy;
+});
 AppConfig.Configuration = builder.Configuration;
 var app = builder.Build();
 
@@ -20,7 +56,7 @@ if (!app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-// 2. GÜNCELLENDÝ: .tile uzantýsýný .NET'in tanýmasý için MIME ayarý eklendi
+// 2. Gï¿½NCELLENDï¿½: .tile uzantï¿½sï¿½nï¿½ .NET'in tanï¿½masï¿½ iï¿½in MIME ayarï¿½ eklendi
 var provider = new FileExtensionContentTypeProvider();
 provider.Mappings[".tile"] = "image/png";
 
@@ -31,6 +67,7 @@ app.UseStaticFiles(new StaticFileOptions
 
 app.UseRouting();
 
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllerRoute(

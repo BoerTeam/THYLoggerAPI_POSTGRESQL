@@ -48,11 +48,15 @@
 
                 <li class="nav-item dropdown dropdown-user">
                     <a class="nav-link dropdown-toggle dropdown-user-link" id="dropdown-user" href="#" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                        <div class="user-nav d-sm-flex d-none"><span class="user-name fw-bolder">Kullanıcı</span><span class="user-status">Admin</span></div><span class="avatar"><img class="round" src="~/app-assets/images/portrait/small/images.png" alt="avatar" height="40" width="40"><span class="avatar-status-online"></span></span>
+                        <div class="user-nav d-sm-flex d-none"><span class="user-name fw-bolder">@User.Identity?.Name</span><span class="user-status">Kullanıcı</span></div><span class="avatar"><img class="round" src="~/app-assets/images/portrait/small/images.png" alt="avatar" height="40" width="40"><span class="avatar-status-online"></span></span>
                     </a>
                     <div class="dropdown-menu dropdown-menu-end" aria-labelledby="dropdown-user">
 
-                        <div class="dropdown-divider"></div><a class="dropdown-item" href="/Home/Login"><i class="me-50" data-feather="power"></i> Çıkış</a>
+                        <div class="dropdown-divider"></div>
+                        <form action="/Home/Logout" method="post" class="m-0 p-0">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="dropdown-item border-0 bg-transparent w-100 text-start"><i class="me-50" data-feather="power"></i> Çıkış</button>
+                        </form>
                     </div>
                 </li>
             </ul>

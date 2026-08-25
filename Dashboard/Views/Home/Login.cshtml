@@ -74,32 +74,13 @@
 
             <div class="text-center mb-3">
                 <h4 class="card-title mb-1">Hoş Geldiniz! 👋</h4>
-                <p class="text-muted">Lütfen hesabınıza giriş yapın.</p>
+                <p class="text-muted">THY kurumsal hesabınız ile giriş yapın.</p>
             </div>
 
             <form class="auth-login-form" action="/Home/Login" method="POST">
-
-                <div class="mb-2">
-                    <label for="login-email" class="form-label">Kullanıcı Adı / Email</label>
-                    <input type="text" class="form-control" id="login-email" name="Username" placeholder="admin" tabindex="1" autofocus required />
-                </div>
-
-                <div class="mb-2">
-                    <label class="form-label" for="login-password">Şifre</label>
-                    <div class="input-group input-group-merge form-password-toggle">
-                        <input type="password" class="form-control form-control-merge" id="login-password" name="Password" tabindex="2" placeholder="&#183;&#183;&#183;&#183;&#183;&#183;&#183;&#183;&#183;&#183;&#183;&#183;" required />
-                        <span class="input-group-text cursor-pointer"><i data-feather="eye"></i></span>
-                    </div>
-                </div>
-
-                <div class="mb-2">
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="remember-me" tabindex="3" />
-                        <label class="form-check-label" for="remember-me"> Beni Hatırla </label>
-                    </div>
-                </div>
-
-                <button type="submit" class="btn btn-primary w-100 mb-2" tabindex="4">Giriş Yap</button>
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="returnUrl" value="@ViewData["ReturnUrl"]" />
+                <button type="submit" class="btn btn-primary w-100 mb-2" tabindex="1">THY SSO ile Giriş Yap</button>
             </form>
 
             <div class="divider my-3">
