@@ -47,9 +47,9 @@ namespace THYLoggerAPI_POSTGRESQL.Controllers
             entity.DollyId = dolly.Id;
 
             // 4. Zaman damgası kontrolü
-            
-                entity.Time = DateTime.Now;
-            
+
+            entity.Time = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Utc);
+
 
             // 5. Kaydet
             _context.BosDolu.Add(entity);

@@ -45,9 +45,9 @@ namespace THYLoggerAPI_POSTGRESQL.Controllers
             // 3. Bulunan cihazın Id'sini GPS verisine ata
             entity.DollyId = dolly.Id;
 
-            
-             entity.Time = DateTime.Now;
-            
+
+            entity.Time = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Utc);
+
 
             // 5. Kaydet
             _context.Gpsdatum.Add(entity);

@@ -59,7 +59,7 @@ namespace THYLoggerAPI_POSTGRESQL.Controllers
                 entity.Sicaklik1 = (float)Math.Round(hesaplanan, 2);
             }
 
-            entity.Time = DateTime.Now;
+            entity.Time = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Utc);
 
             _context.Sicaklik.Add(entity);
             _context.SaveChanges();
