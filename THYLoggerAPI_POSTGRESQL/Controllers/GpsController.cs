@@ -46,7 +46,7 @@ namespace THYLoggerAPI_POSTGRESQL.Controllers
             entity.DollyId = dolly.Id;
 
 
-            entity.Time = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Utc);
+            entity.Time = DateTime.Now;
 
 
             // 5. Kaydet

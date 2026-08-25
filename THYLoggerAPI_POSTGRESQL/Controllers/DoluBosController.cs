@@ -48,7 +48,7 @@ namespace THYLoggerAPI_POSTGRESQL.Controllers
 
             // 4. Zaman damgası kontrolü
 
-            entity.Time = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Utc);
+            entity.Time = DateTime.Now;
 
 
             // 5. Kaydet

@@ -12,6 +12,7 @@ namespace THYLoggerAPI_POSTGRESQL.Model
         public bool? IsEnabled { get; set; }
         public float? Latitude { get; set; }
         public float? Longitude { get; set; }
+        [Column(TypeName = "timestamp without time zone")]
         public DateTime? Time { get; set; }
         public float? Altitude { get; set; }
         public float? SpeedKnots { get; set; }

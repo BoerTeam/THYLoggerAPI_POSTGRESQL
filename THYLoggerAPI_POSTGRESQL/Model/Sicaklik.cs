@@ -8,7 +8,7 @@ namespace THYLoggerAPI_POSTGRESQL.Model
     {
         [Key]
         public int Id { get; set; }
-
+        [Column(TypeName = "timestamp without time zone")]
         public DateTime? Time { get; set; }
 
         public float? Sicaklik1 { get; set; }

@@ -2,7 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Serilog;
 using THYLoggerAPI_POSTGRESQL.Context;
 using THYLoggerAPI_POSTGRESQL.Interceptors;
-
+AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 var builder = WebApplication.CreateBuilder(args);
 
 // 0. Serilog Yapýlandýrmasý (appsettings.json üzerindeki "Serilog" bloðunu okur)
