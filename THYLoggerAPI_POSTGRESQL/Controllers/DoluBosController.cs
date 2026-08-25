@@ -30,6 +30,7 @@ namespace THYLoggerAPI_POSTGRESQL.Controllers
             // 1. Seri numarası gönderilmiş mi kontrol et
             if (string.IsNullOrEmpty(entity.SerialNumber))
             {
+                _logger.LogError("SerialNumber gönderilmesi zorunludur.");
                 return BadRequest("SerialNumber gönderilmesi zorunludur.");
             }
 
@@ -38,6 +39,7 @@ namespace THYLoggerAPI_POSTGRESQL.Controllers
 
             if (dolly == null)
             {
+                _logger.LogError("'{SerialNumber}' seri numaralı cihaz sistemde kayıtlı değil.", entity.SerialNumber);
                 return NotFound($"'{entity.SerialNumber}' seri numaralı cihaz sistemde kayıtlı değil.");
             }
 
@@ -46,12 +48,13 @@ namespace THYLoggerAPI_POSTGRESQL.Controllers
 
             // 4. Zaman damgası kontrolü
             
-                entity.Time = DateTime.UtcNow;
+                entity.Time = DateTime.Now;
             
 
             // 5. Kaydet
             _context.BosDolu.Add(entity);
             _context.SaveChanges();
+            _logger.LogInformation("Yeni DoluBos verisi başarıyla eklendi. SerialNumber: {SerialNumber}", entity.SerialNumber);
 
             return Ok(new
             {

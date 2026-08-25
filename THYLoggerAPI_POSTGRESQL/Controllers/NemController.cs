@@ -66,7 +66,7 @@ namespace THYLoggerAPI_POSTGRESQL.Controllers
             }
 
             // 5. Zaman ve Kayıt
-            entity.Time = DateTime.UtcNow;
+            entity.Time = DateTime.Now;
 
             _context.Nem.Add(entity);
             _context.SaveChanges();
