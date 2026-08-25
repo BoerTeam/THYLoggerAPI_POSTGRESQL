@@ -52,7 +52,11 @@
                     </a>
                     <div class="dropdown-menu dropdown-menu-end" aria-labelledby="dropdown-user">
 
-                        <div class="dropdown-divider"></div><a class="dropdown-item" href="/Home/Logout"><i class="me-50" data-feather="power"></i> Çıkış</a>
+                        <div class="dropdown-divider"></div>
+                        <form action="/Home/Logout" method="post" class="m-0 p-0">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="dropdown-item border-0 bg-transparent w-100 text-start"><i class="me-50" data-feather="power"></i> Çıkış</button>
+                        </form>
                     </div>
                 </li>
             </ul>

@@ -183,14 +183,18 @@ namespace Dashboard.Controllers
                 return RedirectToAction("Index", "Home");
             }
 
-            ViewData["ReturnUrl"] = string.IsNullOrWhiteSpace(returnUrl) ? Url.Action("Index", "Home") : returnUrl;
+            var fallbackUrl = Url.Action("Index", "Home");
+            ViewData["ReturnUrl"] = !string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl)
+                ? returnUrl
+                : fallbackUrl;
             return View();
         }
 
         [AllowAnonymous]
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public IActionResult Login(string? returnUrl = null)
+        [ActionName("Login")]
+        public IActionResult LoginPost(string? returnUrl = null)
         {
             var redirectUrl = Url.Action("Index", "Home") ?? "/";
             if (!string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl))
@@ -203,11 +207,12 @@ namespace Dashboard.Controllers
                 OpenIdConnectDefaults.AuthenticationScheme);
         }
 
-        [HttpGet]
+        [HttpPost]
+        [ValidateAntiForgeryToken]
         public IActionResult Logout()
         {
             return SignOut(
-                new AuthenticationProperties { RedirectUri = Url.Action("Login", "Home") },
+                new AuthenticationProperties { RedirectUri = Url.Action("Login", "Home") ?? "/" },
                 CookieAuthenticationDefaults.AuthenticationScheme,
                 OpenIdConnectDefaults.AuthenticationScheme);
         }

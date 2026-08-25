@@ -1,7 +1,6 @@
 using Dashboard.Models;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
-using Microsoft.IdentityModel.Tokens;
 using Microsoft.AspNetCore.StaticFiles; // 1. EKLEND�: Static files provider i�in gerekli
 using System.Xml;
 
@@ -10,6 +9,11 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.AddControllersWithViews();
 builder.Services.AddHttpClient();
+var oidcClientId = builder.Configuration["Authentication:Oidc:ClientId"];
+if (string.IsNullOrWhiteSpace(oidcClientId) || oidcClientId.StartsWith("<set-via-env:", StringComparison.Ordinal))
+{
+    throw new InvalidOperationException("Authentication:Oidc:ClientId must be configured for THY OIDC login.");
+}
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
@@ -23,7 +27,7 @@ builder.Services.AddAuthentication(options =>
 {
     options.SignInScheme = CookieAuthenticationDefaults.AuthenticationScheme;
     options.MetadataAddress = builder.Configuration["Authentication:Oidc:MetadataAddress"] ?? "https://oidctest.thy.com/idp/.well-known/openid-configurations";
-    options.ClientId = builder.Configuration["Authentication:Oidc:ClientId"] ?? string.Empty;
+    options.ClientId = oidcClientId;
     options.CallbackPath = builder.Configuration["Authentication:Oidc:CallbackPath"] ?? "/callback";
     options.ResponseType = "code";
     options.UsePkce = true;
@@ -34,11 +38,6 @@ builder.Services.AddAuthentication(options =>
     options.Scope.Add("openid");
     options.Scope.Add("profile");
     options.Scope.Add("email");
-
-    options.TokenValidationParameters = new TokenValidationParameters
-    {
-        NameClaimType = "preferred_username"
-    };
 });
 builder.Services.AddAuthorization(options =>
 {
