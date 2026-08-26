@@ -7,6 +7,6 @@ namespace Dashboard.Models
         public string? Domain { get; set; }
         public string? BaseDn { get; set; }
         public string SearchFilter { get; set; } = "(sAMAccountName={0})";
-        public bool UseSsl { get; set; }
+        public bool UseSsl { get; set; } = true;
     }
 }

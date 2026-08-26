@@ -2,6 +2,7 @@ using Dashboard.Models;
 using Microsoft.Extensions.Options;
 using System.DirectoryServices.Protocols;
 using System.Net;
+using System.Text.RegularExpressions;
 
 namespace Dashboard.Services
 {
@@ -21,6 +22,7 @@ namespace Dashboard.Services
 
     public class LdapAuthenticationService : ILdapAuthenticationService
     {
+        private static readonly Regex AllowedUsernamePattern = new("^[a-zA-Z0-9._@\\\\-]+$", RegexOptions.Compiled);
         private readonly LdapAuthenticationOptions _options;
         private readonly ILogger<LdapAuthenticationService> _logger;
 
@@ -35,6 +37,15 @@ namespace Dashboard.Services
         public Task<LdapAuthenticationResult> AuthenticateAsync(string username, string password, CancellationToken cancellationToken = default)
         {
             var trimmedUsername = username.Trim();
+            if (!TryNormalizeUsername(trimmedUsername, out var accountName, out var bindUsername))
+            {
+                return Task.FromResult(new LdapAuthenticationResult
+                {
+                    ErrorMessage = "Kullanıcı adı formatı geçersiz."
+                });
+            }
+
+            var safeUsernameForLog = SanitizeForLog(trimmedUsername);
             if (string.IsNullOrWhiteSpace(_options.Host) || _options.Host.StartsWith("<set-via-env:", StringComparison.Ordinal))
             {
                 return Task.FromResult(new LdapAuthenticationResult
@@ -42,8 +53,6 @@ namespace Dashboard.Services
                     ErrorMessage = "LDAP bağlantı ayarları tamamlanmadığı için giriş yapılamıyor."
                 });
             }
-
-            var bindUsername = BuildBindUsername(trimmedUsername);
 
             try
             {
@@ -65,14 +74,14 @@ namespace Dashboard.Services
 
                 if (!string.IsNullOrWhiteSpace(_options.BaseDn))
                 {
-                    result = PopulateDirectoryDetails(connection, trimmedUsername, result);
+                    result = PopulateDirectoryDetails(connection, accountName, result);
                 }
 
                 return Task.FromResult(result);
             }
             catch (LdapException ex) when (ex.ErrorCode == 49)
             {
-                _logger.LogWarning(ex, "LDAP login failed for user {Username}", trimmedUsername);
+                _logger.LogWarning(ex, "LDAP login failed for user {Username}", safeUsernameForLog);
                 return Task.FromResult(new LdapAuthenticationResult
                 {
                     ErrorMessage = "Kullanıcı adı veya şifre hatalı."
@@ -80,7 +89,7 @@ namespace Dashboard.Services
             }
             catch (LdapException ex)
             {
-                _logger.LogError(ex, "LDAP connection error for user {Username}", trimmedUsername);
+                _logger.LogError(ex, "LDAP connection error for user {Username}", safeUsernameForLog);
                 return Task.FromResult(new LdapAuthenticationResult
                 {
                     ErrorMessage = "LDAP servisine bağlanırken bir hata oluştu. Lütfen daha sonra tekrar deneyin."
@@ -88,7 +97,7 @@ namespace Dashboard.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Unexpected LDAP login error for user {Username}", trimmedUsername);
+                _logger.LogError(ex, "Unexpected LDAP login error for user {Username}", safeUsernameForLog);
                 return Task.FromResult(new LdapAuthenticationResult
                 {
                     ErrorMessage = "Giriş işlemi sırasında beklenmeyen bir hata oluştu."
@@ -96,23 +105,50 @@ namespace Dashboard.Services
             }
         }
 
-        private string BuildBindUsername(string username)
+        private bool TryNormalizeUsername(string username, out string accountName, out string bindUsername)
         {
-            if (username.Contains('@') || string.IsNullOrWhiteSpace(_options.Domain) || _options.Domain.StartsWith("<set-via-env:", StringComparison.Ordinal))
+            accountName = string.Empty;
+            bindUsername = string.Empty;
+
+            if (string.IsNullOrWhiteSpace(username) || !AllowedUsernamePattern.IsMatch(username))
             {
-                return username;
+                return false;
             }
 
-            return $"{username}@{_options.Domain}";
+            var normalizedAccountName = username.Contains('\\')
+                ? username.Split('\\', 2)[1]
+                : username.Contains('@')
+                    ? username.Split('@', 2)[0]
+                    : username;
+
+            if (!AllowedUsernamePattern.IsMatch(normalizedAccountName))
+            {
+                return false;
+            }
+
+            accountName = normalizedAccountName;
+            if (username.Contains('@'))
+            {
+                bindUsername = username;
+                return true;
+            }
+
+            if (!string.IsNullOrWhiteSpace(_options.Domain) && !_options.Domain.StartsWith("<set-via-env:", StringComparison.Ordinal))
+            {
+                bindUsername = $"{accountName}@{_options.Domain}";
+                return true;
+            }
+
+            bindUsername = username;
+            return true;
         }
 
         private LdapAuthenticationResult PopulateDirectoryDetails(
             LdapConnection connection,
-            string username,
+            string accountName,
             LdapAuthenticationResult result)
         {
-            var escapedUsername = EscapeFilterValue(username.Contains('@') ? username.Split('@')[0] : username);
-            var filter = string.Format(_options.SearchFilter, escapedUsername);
+            var filter = string.Format(_options.SearchFilter, accountName);
             var request = new SearchRequest(_options.BaseDn, filter, SearchScope.Subtree, "displayName", "mail");
             var response = (SearchResponse)connection.SendRequest(request);
             var entry = response.Entries.Cast<SearchResultEntry>().FirstOrDefault();
@@ -131,14 +167,8 @@ namespace Dashboard.Services
             };
         }
 
-        private static string EscapeFilterValue(string value)
-        {
-            return value
-                .Replace("\\", "\\5c", StringComparison.Ordinal)
-                .Replace("*", "\\2a", StringComparison.Ordinal)
-                .Replace("(", "\\28", StringComparison.Ordinal)
-                .Replace(")", "\\29", StringComparison.Ordinal)
-                .Replace("\0", "\\00", StringComparison.Ordinal);
-        }
+        private static string SanitizeForLog(string value) =>
+            value.Replace("\r", string.Empty, StringComparison.Ordinal)
+                 .Replace("\n", string.Empty, StringComparison.Ordinal);
     }
 }
