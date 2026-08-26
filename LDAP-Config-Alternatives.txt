@@ -1,0 +1,116 @@
+# LDAP Konfigürasyon Alternatifleri
+# Aşağıdaki formatlardan birini test edin
+
+## ============================================
+## SENARYO 1: Domain = boerltd.local (Standart)
+## ============================================
+{
+  "Authentication": {
+	"Ldap": {
+	  "Host": "192.168.0.17",
+	  "Port": 389,
+	  "Domain": "boerltd.local",
+	  "BaseDn": "DC=boerltd,DC=local",
+	  "SearchFilter": "(sAMAccountName={0})",
+	  "UseSsl": false
+	}
+  }
+}
+
+# Giriş formatları:
+# - administrator
+# - boerltd\administrator
+# - administrator@boerltd.local
+
+
+## ============================================
+## SENARYO 2: Domain = boerltd (Sadece NetBIOS)
+## ============================================
+{
+  "Authentication": {
+	"Ldap": {
+	  "Host": "192.168.0.17",
+	  "Port": 389,
+	  "Domain": "boerltd",
+	  "BaseDn": "DC=boerltd,DC=local",
+	  "SearchFilter": "(sAMAccountName={0})",
+	  "UseSsl": false
+	}
+  }
+}
+
+# Giriş formatları:
+# - administrator
+# - boerltd\administrator
+
+
+## ============================================
+## SENARYO 3: Domain boş - Sadece backslash format
+## ============================================
+{
+  "Authentication": {
+	"Ldap": {
+	  "Host": "192.168.0.17",
+	  "Port": 389,
+	  "Domain": "",
+	  "BaseDn": "DC=boerltd,DC=local",
+	  "SearchFilter": "(sAMAccountName={0})",
+	  "UseSsl": false
+	}
+  }
+}
+
+# Giriş formatları:
+# - boerltd\administrator (ZORUNLU - Domain olmadan çalışmaz)
+
+
+## ============================================
+## SENARYO 4: Tam hostname ile
+## ============================================
+{
+  "Authentication": {
+	"Ldap": {
+	  "Host": "dc.boerltd.local",
+	  "Port": 389,
+	  "Domain": "boerltd.local",
+	  "BaseDn": "DC=boerltd,DC=local",
+	  "SearchFilter": "(sAMAccountName={0})",
+	  "UseSsl": false
+	}
+  }
+}
+
+
+## ============================================
+## SENARYO 5: SSL ile (Port 636)
+## ============================================
+{
+  "Authentication": {
+	"Ldap": {
+	  "Host": "192.168.0.17",
+	  "Port": 636,
+	  "Domain": "boerltd.local",
+	  "BaseDn": "DC=boerltd,DC=local",
+	  "SearchFilter": "(sAMAccountName={0})",
+	  "UseSsl": true
+	}
+  }
+}
+
+
+## ============================================
+## TEST KOMUTLARI
+## ============================================
+
+# PowerShell ile domain bilgisi almak:
+Get-ADDomain -Server 192.168.0.17 | Select-Object DNSRoot, NetBIOSName, DistinguishedName
+
+# Ping testi:
+Test-NetConnection -ComputerName 192.168.0.17 -Port 389
+
+# LDAP bağlantı testi (PowerShell):
+$ldap = New-Object System.DirectoryServices.Protocols.LdapConnection("192.168.0.17:389")
+$ldap.AuthType = [System.DirectoryServices.Protocols.AuthType]::Basic
+$credential = New-Object System.Net.NetworkCredential("boerltd\administrator", "YourPassword")
+$ldap.Credential = $credential
+$ldap.Bind()

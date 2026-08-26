@@ -10,6 +10,12 @@
 (function (window, document, $) {
   'use strict';
 
+  // Check if jQuery is loaded
+  if (typeof $ === 'undefined') {
+    console.error('app-menu.js requires jQuery to be loaded first');
+    return;
+  }
+
   var vh = window.innerHeight * 0.01;
   document.documentElement.style.setProperty('--vh', vh + 'px');
 

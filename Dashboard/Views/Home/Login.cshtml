@@ -113,13 +113,14 @@
         </div>
     </div>
     <script src="~/app-assets/vendors/js/vendors.min.js"></script>
-    <script src="~/app-assets/js/core/app.js"></script>
     <script src="https://unpkg.com/feather-icons"></script>
     <script>
         $(window).on('load', function() {
             if (feather) {
                 feather.replace();
             }
+            // Remove loading class
+            $('html').removeClass('loading').addClass('loaded');
         });
     </script>
 </body>

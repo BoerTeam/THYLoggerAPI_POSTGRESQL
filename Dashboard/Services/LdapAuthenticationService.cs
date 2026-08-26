@@ -54,6 +54,9 @@ namespace Dashboard.Services
                 });
             }
 
+            _logger.LogInformation("LDAP authentication attempt - Input: {InputUsername}, Account: {AccountName}, Bind: {BindUsername}, Host: {Host}:{Port}", 
+                safeUsernameForLog, accountName, bindUsername, _options.Host, _options.Port);
+
             try
             {
                 using var connection = new LdapConnection(new LdapDirectoryIdentifier(_options.Host, _options.Port))
@@ -65,6 +68,8 @@ namespace Dashboard.Services
                 connection.SessionOptions.ProtocolVersion = 3;
                 connection.SessionOptions.SecureSocketLayer = _options.UseSsl;
                 connection.Bind();
+
+                _logger.LogInformation("LDAP authentication successful for user {Username}", safeUsernameForLog);
 
                 var result = new LdapAuthenticationResult
                 {
@@ -81,7 +86,8 @@ namespace Dashboard.Services
             }
             catch (LdapException ex) when (ex.ErrorCode == 49)
             {
-                _logger.LogWarning(ex, "LDAP login failed for user {Username}", safeUsernameForLog);
+                _logger.LogWarning(ex, "LDAP login failed for user {Username} (Error 49 - Invalid Credentials). Bind username used: {BindUsername}", 
+                    safeUsernameForLog, bindUsername);
                 return Task.FromResult(new LdapAuthenticationResult
                 {
                     ErrorMessage = "Kullanıcı adı veya şifre hatalı."
@@ -89,7 +95,7 @@ namespace Dashboard.Services
             }
             catch (LdapException ex)
             {
-                _logger.LogError(ex, "LDAP connection error for user {Username}", safeUsernameForLog);
+                _logger.LogError(ex, "LDAP connection error for user {Username} (Error {ErrorCode})", safeUsernameForLog, ex.ErrorCode);
                 return Task.FromResult(new LdapAuthenticationResult
                 {
                     ErrorMessage = "LDAP servisine bağlanırken bir hata oluştu. Lütfen daha sonra tekrar deneyin."
@@ -115,6 +121,7 @@ namespace Dashboard.Services
                 return false;
             }
 
+            // Extract account name from different formats
             var normalizedAccountName = username.Contains('\\')
                 ? username.Split('\\', 2)[1]
                 : username.Contains('@')
@@ -127,12 +134,23 @@ namespace Dashboard.Services
             }
 
             accountName = normalizedAccountName;
+
+            // If user already provided full format (domain\user or user@domain), use it as-is
             if (username.Contains('@'))
             {
                 bindUsername = username;
                 return true;
             }
 
+            // If user provided DOMAIN\username format, keep it as backslash format
+            // This is important for AD authentication
+            if (username.Contains('\\'))
+            {
+                bindUsername = username;
+                return true;
+            }
+
+            // Otherwise, append the configured domain
             if (!string.IsNullOrWhiteSpace(_options.Domain) && !_options.Domain.StartsWith("<set-via-env:", StringComparison.Ordinal))
             {
                 bindUsername = $"{accountName}@{_options.Domain}";
