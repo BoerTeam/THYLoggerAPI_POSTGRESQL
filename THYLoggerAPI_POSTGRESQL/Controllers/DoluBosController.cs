@@ -1,5 +1,5 @@
-﻿using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using THYLoggerAPI_POSTGRESQL.Context;
 using THYLoggerAPI_POSTGRESQL.Model;
 
@@ -11,57 +11,72 @@ namespace THYLoggerAPI_POSTGRESQL.Controllers
     {
         private readonly ApplicationDbContext _context;
         private readonly ILogger<DoluBosController> _logger;
+
         public DoluBosController(ApplicationDbContext context, ILogger<DoluBosController> logger)
         {
             _context = context;
             _logger = logger;
         }
-        [HttpGet("Get")]
-        public IEnumerable<BosDolu> Get()
+
+        [HttpGet]
+        public async Task<IActionResult> GetAll()
         {
-            _logger.LogInformation("Tüm Dolly verileri listeleniyor.");
-            return _context.BosDolu.OrderBy(i => i.Id).ToList();
-            
+            _logger.LogInformation("Tüm BosDolu verileri listeleniyor.");
+
+            var list = await _context.BosDolu
+                .AsNoTracking()
+                .OrderBy(i => i.Id)
+                .ToListAsync();
+
+            return Ok(list);
         }
 
-        [HttpPost("Add")]
-        public IActionResult Add(BosDolu entity)
+        [HttpPost]
+        public async Task<IActionResult> Add([FromBody] BosDolu entity)
         {
             // 1. Seri numarası gönderilmiş mi kontrol et
-            if (string.IsNullOrEmpty(entity.SerialNumber))
+            if (string.IsNullOrWhiteSpace(entity.SerialNumber))
             {
-                _logger.LogError("SerialNumber gönderilmesi zorunludur.");
+                _logger.LogWarning("SerialNumber gönderilmedi.");
                 return BadRequest("SerialNumber gönderilmesi zorunludur.");
             }
 
-            // 2. Veritabanında bu seri numarasına sahip Dolly'yi bul
-            var dolly = _context.Dolly.FirstOrDefault(x => x.SerialNumber == entity.SerialNumber);
+            // 2. Veritabanında bu seri numarasına sahip Dolly'yi asenkron bul
+            var dolly = await _context.Dolly
+                .FirstOrDefaultAsync(x => x.SerialNumber == entity.SerialNumber);
 
             if (dolly == null)
             {
-                _logger.LogError("'{SerialNumber}' seri numaralı cihaz sistemde kayıtlı değil.", entity.SerialNumber);
+                _logger.LogWarning("'{SerialNumber}' seri numaralı cihaz sistemde kayıtlı değil.", entity.SerialNumber);
                 return NotFound($"'{entity.SerialNumber}' seri numaralı cihaz sistemde kayıtlı değil.");
             }
 
             // 3. Bulunan cihazın Id'sini BosDolu kaydına ata
             entity.DollyId = dolly.Id;
 
-            // 4. Zaman damgası kontrolü
+            // 4. Zaman damgası (UTC veya yerel saat tercihe göre, DateTime.UtcNow önerilir)
+            entity.Time = DateTime.UtcNow;
 
-            entity.Time = DateTime.Now;
-
-
-            // 5. Kaydet
-            _context.BosDolu.Add(entity);
-            _context.SaveChanges();
-            _logger.LogInformation("Yeni DoluBos verisi başarıyla eklendi. SerialNumber: {SerialNumber}", entity.SerialNumber);
-
-            return Ok(new
+            try
             {
-                Message = "DoluBos Verisi Başarıyla Eklendi",
-                Device = dolly.Name,
-                Status = entity.SensorDegeri == true ? "Dolu" : "Boş"
-            });
+                // 5. Kaydet
+                await _context.BosDolu.AddAsync(entity);
+                await _context.SaveChangesAsync();
+
+                _logger.LogInformation("Yeni BosDolu verisi başarıyla eklendi. SerialNumber: {SerialNumber}", entity.SerialNumber);
+
+                return Ok(new
+                {
+                    Message = "DoluBos Verisi Başarıyla Eklendi",
+                    Device = dolly.Name,
+                    Status = entity.SensorDegeri == true ? "Dolu" : "Boş"
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "BosDolu eklenirken bir veritabanı hatası oluştu. SerialNumber: {SerialNumber}", entity.SerialNumber);
+                return StatusCode(500, "Sunucu hatası: " + ex.Message);
+            }
         }
     }
 }
