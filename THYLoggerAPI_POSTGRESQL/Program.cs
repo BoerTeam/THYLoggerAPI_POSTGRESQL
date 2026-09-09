@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Serilog;
 using THYLoggerAPI_POSTGRESQL.Context;
 using THYLoggerAPI_POSTGRESQL.Interceptors;
+using THYLoggerAPI_POSTGRESQL.Model;
 using THYLoggerAPI_POSTGRESQL.Services;
 
 AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
@@ -23,6 +24,7 @@ builder.Services.AddScoped<AuditInterceptor>();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<RoleService>();
+builder.Services.AddScoped<PageService>();
 
 // IoT ve Cihaz Takip Servis Kayýtlarý
 builder.Services.AddScoped<DollyService>();
@@ -42,7 +44,7 @@ builder.Services.AddDbContext<ApplicationDbContext>((sp, options) =>
 
 var app = builder.Build();
 
-// Otomatik Database Migration (Eksik Tablolarý Otomatik Yükler/Günceller)
+// Otomatik Database Migration ve Seed Verileri
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
@@ -50,17 +52,40 @@ using (var scope = app.Services.CreateScope())
     {
         var context = services.GetRequiredService<ApplicationDbContext>();
         context.Database.Migrate();
+
+        // Temel Ýzinlerin (Permissions) Otomatik Eklenmesi
+        if (!context.Permissions.Any())
+        {
+            context.Permissions.AddRange(
+                new Permission { Name = "Dolly.Read", Description = "Dolly Cihazlarýný Görüntüleme", IsActive = true },
+                new Permission { Name = "Dolly.Write", Description = "Dolly Cihazý Yönetimi", IsActive = true },
+                new Permission { Name = "User.Manage", Description = "Kullanýcý ve Rol Yönetimi", IsActive = true }
+            );
+            context.SaveChanges();
+            Console.WriteLine("--> Temel sistem izinleri (Permissions) veritabanýna eklendi.");
+        }
+
+        // Temel Sayfalarýn (Pages) Otomatik Eklenmesi
+        if (!context.Pages.Any())
+        {
+            context.Pages.AddRange(
+                new Page { Name = "Dolly Takip", Route = "/Dolly/Index", PermissionCode = "Dolly.Read", Icon = "fa-truck", Order = 1, IsActive = true },
+                new Page { Name = "Kullanýcý Yönetimi", Route = "/Users/Index", PermissionCode = "User.Manage", Icon = "fa-users", Order = 2, IsActive = true }
+            );
+            context.SaveChanges();
+            Console.WriteLine("--> Temel sayfa (Pages) verileri veritabanýna eklendi.");
+        }
+
         Console.WriteLine("--> Veritabaný ve tablolar baþarýyla kontrol edildi / güncellendi.");
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"--> Migration iþlemi sýrasýnda hata oluþtu: {ex.Message}");
+        Console.WriteLine($"--> Migration/Seed iþlemi sýrasýnda hata oluþtu: {ex.Message}");
     }
 }
 
 // 2. HTTP Request Pipeline (Middleware) Yapýlandýrmasý
 app.UseSerilogRequestLogging();
-
 app.UseSwagger();
 app.UseSwaggerUI(c =>
 {
@@ -69,9 +94,7 @@ app.UseSwaggerUI(c =>
 });
 
 app.UseHttpsRedirection();
-
 app.UseAuthorization();
-
 app.MapControllers();
 
 app.Run();
