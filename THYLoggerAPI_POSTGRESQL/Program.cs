@@ -17,13 +17,19 @@ builder.Host.UseSerilog((context, services, configuration) => configuration
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
-
 builder.Services.AddScoped<AuditInterceptor>();
 
-// Yetkilendirme ve Kimlik Doðrulama Servis Kayýtlarý (Dependency Injection)
+// Yetkilendirme ve Kimlik Doðrulama Servis Kayýtlarý
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<RoleService>();
+
+// IoT ve Cihaz Takip Servis Kayýtlarý
+builder.Services.AddScoped<DollyService>();
+builder.Services.AddScoped<DoluBosService>();
+builder.Services.AddScoped<GpsService>();
+builder.Services.AddScoped<NemService>();
+builder.Services.AddScoped<SicaklikService>();
 
 // PostgreSQL Baðlantýsý
 builder.Services.AddDbContext<ApplicationDbContext>((sp, options) =>

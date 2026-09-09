@@ -7,46 +7,49 @@ namespace THYLoggerAPI_POSTGRESQL.Interceptors;
 
 public class AuditInterceptor : SaveChangesInterceptor
 {
-    // Senkron _context.SaveChanges() çağrıları için:
+    // 1. Senkron Kayıt Öncesi
     public override InterceptionResult<int> SavingChanges(
         DbContextEventData eventData,
         InterceptionResult<int> result)
     {
-        AuditEntities(eventData.Context);
+        CreateAuditLogs(eventData.Context);
         return base.SavingChanges(eventData, result);
     }
 
-    // Asenkron _context.SaveChangesAsync() çağrıları için:
+    // 2. Asenkron Kayıt Öncesi
     public override ValueTask<InterceptionResult<int>> SavingChangesAsync(
         DbContextEventData eventData,
         InterceptionResult<int> result,
         CancellationToken cancellationToken = default)
     {
-        AuditEntities(eventData.Context);
+        CreateAuditLogs(eventData.Context);
         return base.SavingChangesAsync(eventData, result, cancellationToken);
     }
 
-    private void AuditEntities(DbContext? dbContext)
+    private void CreateAuditLogs(DbContext? dbContext)
     {
         if (dbContext == null) return;
 
+        // Sonsuz döngüyü önlemek için ChangeTracker'ı donduruyoruz
+        dbContext.ChangeTracker.DetectChanges();
+
         var auditEntries = new List<AuditLog>();
 
-        // ChangeTracker.Entries() ile takip edilen verileri alıyoruz
-        var entries = dbContext.ChangeTracker.Entries().ToList();
+        // Sadece işlem gören gerçek varlıkları filtreliyoruz
+        var entries = dbContext.ChangeTracker.Entries()
+            .Where(e => e.Entity is not AuditLog &&
+                       (e.State == EntityState.Added || e.State == EntityState.Modified || e.State == EntityState.Deleted))
+            .ToList();
 
         foreach (var entry in entries)
         {
-            // AuditLog tablosunun kendisini ve değişmeyen verileri izleme
-            if (entry.Entity is AuditLog || entry.State == EntityState.Detached || entry.State == EntityState.Unchanged)
-                continue;
-
             var oldValues = new Dictionary<string, object?>();
             var newValues = new Dictionary<string, object?>();
             string primaryKey = string.Empty;
 
             foreach (var property in entry.Properties)
             {
+                // Primary Key Alanı
                 if (property.Metadata.IsPrimaryKey())
                 {
                     primaryKey = property.CurrentValue?.ToString() ?? string.Empty;
@@ -75,9 +78,15 @@ public class AuditInterceptor : SaveChangesInterceptor
                 }
             }
 
+            // Yeni eklenen nesnelerde ID henüz DB tarafından üretilmediyse geçici etiket koyuyoruz
+            if (entry.State == EntityState.Added && (primaryKey == "0" || string.IsNullOrEmpty(primaryKey)))
+            {
+                primaryKey = "Auto-Generated";
+            }
+
             auditEntries.Add(new AuditLog
             {
-                UserId = null, // Şimdilik NULL
+                UserId = null, // İleride IHttpContextAccessor ile JWT/Session'dan doldurulabilir
                 EntityName = entry.Entity.GetType().Name,
                 Action = entry.State.ToString(),
                 PrimaryKey = primaryKey,
@@ -89,6 +98,7 @@ public class AuditInterceptor : SaveChangesInterceptor
 
         if (auditEntries.Count > 0)
         {
+            // Set<AuditLog>().AddRange yerine ChangeTracker'a takılmadan doğrudan ekliyoruz
             dbContext.Set<AuditLog>().AddRange(auditEntries);
         }
     }

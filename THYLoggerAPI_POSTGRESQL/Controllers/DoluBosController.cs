@@ -1,7 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using THYLoggerAPI_POSTGRESQL.Context;
 using THYLoggerAPI_POSTGRESQL.Model;
+using THYLoggerAPI_POSTGRESQL.Services;
 
 namespace THYLoggerAPI_POSTGRESQL.Controllers
 {
@@ -9,72 +8,56 @@ namespace THYLoggerAPI_POSTGRESQL.Controllers
     [ApiController]
     public class DoluBosController : ControllerBase
     {
-        private readonly ApplicationDbContext _context;
-        private readonly ILogger<DoluBosController> _logger;
+        private readonly DoluBosService _doluBosService;
 
-        public DoluBosController(ApplicationDbContext context, ILogger<DoluBosController> logger)
+        public DoluBosController(DoluBosService doluBosService)
         {
-            _context = context;
-            _logger = logger;
+            _doluBosService = doluBosService;
         }
 
+        // GET: api/DoluBos
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
-            _logger.LogInformation("Tüm BosDolu verileri listeleniyor.");
-
-            var list = await _context.BosDolu
-                .AsNoTracking()
-                .OrderBy(i => i.Id)
-                .ToListAsync();
-
-            return Ok(list);
-        }
-
-        [HttpPost]
-        public async Task<IActionResult> Add([FromBody] BosDolu entity)
-        {
-            // 1. Seri numarası gönderilmiş mi kontrol et
-            if (string.IsNullOrWhiteSpace(entity.SerialNumber))
-            {
-                _logger.LogWarning("SerialNumber gönderilmedi.");
-                return BadRequest("SerialNumber gönderilmesi zorunludur.");
-            }
-
-            // 2. Veritabanında bu seri numarasına sahip Dolly'yi asenkron bul
-            var dolly = await _context.Dolly
-                .FirstOrDefaultAsync(x => x.SerialNumber == entity.SerialNumber);
-
-            if (dolly == null)
-            {
-                _logger.LogWarning("'{SerialNumber}' seri numaralı cihaz sistemde kayıtlı değil.", entity.SerialNumber);
-                return NotFound($"'{entity.SerialNumber}' seri numaralı cihaz sistemde kayıtlı değil.");
-            }
-
-            // 3. Bulunan cihazın Id'sini BosDolu kaydına ata
-            entity.DollyId = dolly.Id;
-
-            // 4. Zaman damgası (UTC veya yerel saat tercihe göre, DateTime.UtcNow önerilir)
-            entity.Time = DateTime.UtcNow;
-
             try
             {
-                // 5. Kaydet
-                await _context.BosDolu.AddAsync(entity);
-                await _context.SaveChangesAsync();
-
-                _logger.LogInformation("Yeni BosDolu verisi başarıyla eklendi. SerialNumber: {SerialNumber}", entity.SerialNumber);
-
-                return Ok(new
-                {
-                    Message = "DoluBos Verisi Başarıyla Eklendi",
-                    Device = dolly.Name,
-                    Status = entity.SensorDegeri == true ? "Dolu" : "Boş"
-                });
+                var list = await _doluBosService.GetAllAsync();
+                return Ok(list);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "BosDolu eklenirken bir veritabanı hatası oluştu. SerialNumber: {SerialNumber}", entity.SerialNumber);
+                return StatusCode(500, "BosDolu verileri alınırken sunucu hatası oluştu: " + ex.Message);
+            }
+        }
+
+        // POST: api/DoluBos  VEYA  POST: api/DoluBos/Add
+        [HttpPost]
+        [HttpPost("Add")]
+        public async Task<IActionResult> Add([FromBody] BosDolu entity)
+        {
+            if (entity == null)
+            {
+                return BadRequest("Gönderilen veri boş olamaz.");
+            }
+
+            try
+            {
+                var result = await _doluBosService.AddAsync(entity);
+
+                if (!result.IsSuccess)
+                {
+                    if (result.IsNotFound)
+                    {
+                        return NotFound(result.ErrorMessage);
+                    }
+
+                    return BadRequest(result.ErrorMessage);
+                }
+
+                return Ok(result.ResponseData);
+            }
+            catch (Exception ex)
+            {
                 return StatusCode(500, "Sunucu hatası: " + ex.Message);
             }
         }
