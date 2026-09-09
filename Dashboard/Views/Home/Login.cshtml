@@ -1,7 +1,7 @@
-﻿@{
+﻿@model Dashboard.DTO.LoginViewModel
+@{
     Layout = null;
 }
-
 <!DOCTYPE html>
 <html class="loading" lang="tr">
 <head>
@@ -16,60 +16,55 @@
     <link rel="stylesheet" href="~/app-assets/css/components.css">
     <link rel="stylesheet" href="~/app-assets/css/pages/page-auth.css">
 
-    @* Kendi özel CSS'ini eklemek istersen (Genişlik Kısıtlaması İçin) *@
     <style>
-        .auth-wrapper.auth-v1 {
-            display: flex;
-            justify-content: center; /* Yatayda ortalar */
-            align-items: center; /* Düşeyde ortalar */
-            height: 100vh; /* Sayfa boyunu kaplar */
-            background: #f8f8f8; /* Arka plan rengi */
-        }
-
-        .auth-inner {
-            /* Genişliği kısıtlıyoruz (Tavsiye edilen: %30-%40 arası veya max-width) */
-            width: 100%;
-            max-width: 480px;
-            box-shadow: 0 4px 24px 0 rgba(0, 0, 0, 0.1); /* Hafif gölge */
-            border-radius: 12px;
-            background: #fff;
-        }
-
-        .divider {
-            position: relative;
-            text-align: center;
-            margin: 1.5rem 0;
-        }
-
-            .divider:before {
-                content: "";
-                position: absolute;
-                top: 50%;
-                left: 0;
-                width: 100%;
-                height: 1px;
-                background: #e0e0e0;
+            .auth-wrapper.auth-v1 {
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                height: 100vh;
+                background: #f8f8f8;
             }
 
-        .divider-text {
-            position: relative;
-            background: #fff;
-            padding: 0 10px;
-            font-size: 0.8rem;
-            color: #b0b0b0;
-        }
+            .auth-inner {
+                width: 100%;
+                max-width: 480px;
+                box-shadow: 0 4px 24px 0 rgba(0, 0, 0, 0.1);
+                border-radius: 12px;
+                background: #fff;
+            }
+
+            .divider {
+                position: relative;
+                text-align: center;
+                margin: 1.5rem 0;
+            }
+
+                .divider:before {
+                    content: "";
+                    position: absolute;
+                    top: 50%;
+                    left: 0;
+                    width: 100%;
+                    height: 1px;
+                    background: #e0e0e0;
+                }
+
+            .divider-text {
+                position: relative;
+                background: #fff;
+                padding: 0 10px;
+                font-size: 0.8rem;
+                color: #b0b0b0;
+            }
     </style>
 </head>
-
 <body class="vertical-layout vertical-menu-modern blank-page navbar-floating footer-static" data-open="click" data-menu="vertical-menu-modern" data-col="blank-page">
 
     <div class="auth-wrapper auth-v1 px-2">
-
         <div class="auth-inner py-4 px-3">
 
             <a href="javascript:void(0);" class="brand-logo d-flex justify-content-center align-items-center mb-3">
                 <i data-feather="truck" style="width: 32px; height: 32px; color: #7367f0;"></i>
-                
             </a>
 
             <div class="text-center mb-3">
@@ -77,24 +72,28 @@
                 <p class="text-muted">Lütfen hesabınıza giriş yapın.</p>
             </div>
 
-            <form class="auth-login-form" action="/Home/Login" method="POST">
+            <!-- API'den veya Controller'dan dönen hataları göstermek için eklendi -->
+            <div asp-validation-summary="All" class="text-danger mb-2 small text-center"></div>
+
+            <form class="auth-login-form" asp-action="Login" asp-controller="Home" method="POST">
 
                 <div class="mb-2">
                     <label for="login-email" class="form-label">Kullanıcı Adı / Email</label>
-                    <input type="text" class="form-control" id="login-email" name="Username" placeholder="admin" tabindex="1" autofocus required />
+                    <input type="text" class="form-control" id="login-email" asp-for="Username" placeholder="admin" tabindex="1" autofocus required />
                 </div>
 
                 <div class="mb-2">
                     <label class="form-label" for="login-password">Şifre</label>
                     <div class="input-group input-group-merge form-password-toggle">
-                        <input type="password" class="form-control form-control-merge" id="login-password" name="Password" tabindex="2" placeholder="&#183;&#183;&#183;&#183;&#183;&#183;&#183;&#183;&#183;&#183;&#183;&#183;" required />
+                        <input type="password" class="form-control form-control-merge" id="login-password" asp-for="Password" tabindex="2" placeholder="&#183;&#183;&#183;&#183;&#183;&#183;&#183;&#183;&#183;&#183;&#183;&#183;" required />
                         <span class="input-group-text cursor-pointer"><i data-feather="eye"></i></span>
                     </div>
                 </div>
 
                 <div class="mb-2">
                     <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="remember-me" tabindex="3" />
+                        <!-- RememberMe alanına name="RememberMe" / asp-for="RememberMe" bağlandı -->
+                        <input class="form-check-input" type="checkbox" id="remember-me" asp-for="RememberMe" tabindex="3" />
                         <label class="form-check-label" for="remember-me"> Beni Hatırla </label>
                     </div>
                 </div>
@@ -115,15 +114,16 @@
 
         </div>
     </div>
+
     <script src="~/app-assets/vendors/js/vendors.min.js"></script>
     <script src="~/app-assets/js/core/app.js"></script>
     <script src="https://unpkg.com/feather-icons"></script>
     <script>
-        $(window).on('load', function() {
-            if (feather) {
-                feather.replace();
-            }
-        });
+            $(window).on('load', function() {
+                if (typeof feather !== 'undefined') {
+                    feather.replace();
+                }
+            });
     </script>
 </body>
 </html>

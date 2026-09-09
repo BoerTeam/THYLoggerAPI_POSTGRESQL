@@ -9,11 +9,13 @@ namespace THYLoggerAPI_POSTGRESQL.Services
     {
         private readonly ApplicationDbContext _context;
         private readonly ILogger<AuthService> _logger;
+        private readonly JwtTokenService _jwtTokenService;
 
-        public AuthService(ApplicationDbContext context, ILogger<AuthService> logger)
+        public AuthService(ApplicationDbContext context, ILogger<AuthService> logger, JwtTokenService jwtTokenService)
         {
             _context = context;
             _logger = logger;
+            _jwtTokenService = jwtTokenService;
         }
 
         public async Task<UserLoginResponseDto> LoginAsync(LoginRequestDto request)
@@ -54,7 +56,7 @@ namespace THYLoggerAPI_POSTGRESQL.Services
                                 .ThenInclude(rp => rp.Permission)
                     .FirstOrDefaultAsync(u => u.UserName.ToLower() == request.Username.ToLower());
 
-                // 4. İlk Kez Giriş Yapıyorsa Veritabanına Otomatik Kaydet (Yöntem A)
+                // 4. İlk Kez Giriş Yapıyorsa Veritabanına Otomatik Kaydet
                 if (user == null)
                 {
                     _logger.LogInformation("Kullanıcı veritabanında bulunamadı, otomatik kaydetme başlatılıyor. Kullanıcı Adı: {Username}", request.Username);
@@ -94,6 +96,9 @@ namespace THYLoggerAPI_POSTGRESQL.Services
                     .Distinct()
                     .ToList() ?? new List<string>();
 
+                // 7. JWT Token Üretimi
+                var token = _jwtTokenService.GenerateToken(user.Id, user.UserName, roles);
+
                 _logger.LogInformation("Kullanıcı başarıyla giriş yaptı. UserID: {UserId}, Kullanıcı Adı: {Username}, Rol Sayısı: {RoleCount}, İzin Sayısı: {PermissionCount}",
                     user.Id, user.UserName, roles.Count, permissions.Count);
 
@@ -101,6 +106,7 @@ namespace THYLoggerAPI_POSTGRESQL.Services
                 {
                     IsSuccess = true,
                     Message = "Giriş başarılı.",
+                    Token = token, // Üretilen Token yanıta eklendi
                     UserId = user.Id,
                     UserName = user.UserName,
                     Roles = roles,
@@ -110,7 +116,7 @@ namespace THYLoggerAPI_POSTGRESQL.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Login işlemi sırasında beklenmeyen bir veritabanı/sunucu hatası oluştu. Kullanıcı Adı: {Username}", request.Username);
-                throw; // Exception'ı Controller'a ileterek HTTP 500 yönetimine olanak sağlıyoruz.
+                throw;
             }
         }
 

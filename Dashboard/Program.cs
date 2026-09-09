@@ -1,26 +1,44 @@
-using Dashboard.Models;
-using Microsoft.AspNetCore.StaticFiles; // 1. EKLENDÝ: Static files provider için gerekli
-using System.Xml;
+using Dashboard.Services;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.StaticFiles;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
+// 1. Controller ve View Servisleri
 builder.Services.AddControllersWithViews();
-builder.Services.AddHttpClient();
-AppConfig.Configuration = builder.Configuration;
+
+// 2. Cookie Authentication Kaydý
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(options =>
+    {
+        options.LoginPath = "/Home/Login";
+        options.AccessDeniedPath = "/Home/AccessDenied";
+        options.ExpireTimeSpan = TimeSpan.FromHours(8);
+        options.SlidingExpiration = true;
+    });
+
+// 3. HttpContextAccess - ApiService içinde Token okuyabilmek için þart
+builder.Services.AddHttpContextAccessor();
+
+// 4. Typed HttpClient ve ApiService Kaydý
+builder.Services.AddHttpClient<IApiService, ApiService>(client =>
+{
+    var baseUrl = builder.Configuration["ApiSettings:BaseUrl"] ?? "https://localhost:44347";
+    client.BaseAddress = new Uri(baseUrl.EndsWith("/") ? baseUrl : baseUrl + "/");
+    client.Timeout = TimeSpan.FromSeconds(30);
+});
+
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+// 5. HTTP Request Pipeline Yapýlandýrmasý
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Home/Error");
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
+    app.UseHttpsRedirection();
 }
 
-app.UseHttpsRedirection();
-
-// 2. GÜNCELLENDÝ: .tile uzantýsýný .NET'in tanýmasý için MIME ayarý eklendi
+// 6. Offline Harita (.tile) MIME Türü Tanýmlamasý
 var provider = new FileExtensionContentTypeProvider();
 provider.Mappings[".tile"] = "image/png";
 
@@ -31,6 +49,8 @@ app.UseStaticFiles(new StaticFileOptions
 
 app.UseRouting();
 
+// 7. Kimlik Doðrulama ve Yetkilendirme (Sýralama Önemli!)
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllerRoute(
@@ -38,29 +58,3 @@ app.MapControllerRoute(
     pattern: "{controller=Home}/{action=Login}/{id?}");
 
 app.Run();
-
-public partial class Program
-{
-    public static string Service_Link = "";
-    private static void readConfig()
-    {
-        string current = "";
-        XmlTextReader xmlTextReader = new XmlTextReader("Webconfig.xml");
-
-        while (xmlTextReader.Read())
-        {
-            if (xmlTextReader.NodeType == XmlNodeType.Element)
-            {
-                current = xmlTextReader.LocalName;
-            }
-            if (xmlTextReader.NodeType == XmlNodeType.Text)
-            {
-                if (current == "ServiceLink")
-                {
-                    Program.Service_Link = xmlTextReader.Value.Trim();
-                }
-            }
-        }
-        xmlTextReader.Close();
-    }
-}

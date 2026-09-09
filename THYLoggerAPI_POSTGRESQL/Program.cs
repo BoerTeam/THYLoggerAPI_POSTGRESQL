@@ -25,7 +25,7 @@ builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<RoleService>();
 builder.Services.AddScoped<PageService>();
-
+builder.Services.AddScoped<JwtTokenService>();
 // IoT ve Cihaz Takip Servis Kayýtlarý
 builder.Services.AddScoped<DollyService>();
 builder.Services.AddScoped<DoluBosService>();

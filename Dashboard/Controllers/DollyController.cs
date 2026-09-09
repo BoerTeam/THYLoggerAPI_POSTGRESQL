@@ -1,84 +1,88 @@
 ﻿using Dashboard.DTO;
 using Dashboard.Models;
+using Dashboard.Services;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Metadata.Internal;
-using System.Net.Http;
-
 
 namespace Dashboard.Controllers
 {
     public class DollyController : Controller
     {
-        
-        public DollyController()
+        private readonly IApiService _apiService;
+
+        public DollyController(IApiService apiService)
         {
-           
+            _apiService = apiService;
         }
-        public IActionResult Index()
+
+        [HttpGet]
+        public async Task<IActionResult> Index()
         {
-            var DollyList = Models.DollyMethod.GetAllDolly();
-            return View(DollyList);
+            var dollyList = await _apiService.GetAsync<List<Dolly>>("api/Dolly/Get") ?? new List<Dolly>();
+            return View(dollyList);
         }
-        
-        public IActionResult List()
+
+        [HttpGet]
+        public async Task<IActionResult> List()
         {
-            var DollyList = Models.DollyMethod.GetAllDolly();
-            return View(DollyList);
+            var dollyList = await _apiService.GetAsync<List<Dolly>>("api/Dolly/Get") ?? new List<Dolly>();
+            return View(dollyList);
         }
 
         [HttpGet]
         public async Task<IActionResult> Edit(int id)
         {
-            // URL'yi Trimleyerek (temizleyerek) birleştirmek en güvenlisidir
-            var Details = Models.DollyMethod.GetDollyById(id);
+            var dolly = await _apiService.GetAsync<Dolly>($"api/Dolly/GetById/{id}");
+            if (dolly == null)
+            {
+                return NotFound();
+            }
 
-            
-            return View(Details);
+            return View(dolly);
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Edit(Dolly model)
         {
-            // Model doğrulaması başarısızsa API'ye hiç gitmeden formu geri döndür
             if (!ModelState.IsValid)
             {
                 return View(model);
             }
 
-            // Metodu await ile çağırıyoruz
-            var isSuccess =  Models.DollyMethod.UpdateDolly(model);
+            // DÜZELTME: Servis tek tip parametresi bekliyor (<Dolly>)
+            var response = await _apiService.PutAsync<Dolly>("api/Dolly/Update", model);
 
-            if (isSuccess)
+            // Eğer API'den dönen yanıt bir başarı durumu içeriyorsa veya null değilse başarılı sayıyoruz
+            if (response != null)
             {
-                return RedirectToAction("List");
+                return RedirectToAction(nameof(List));
             }
 
-            // Eğer false dönerse kullanıcıya hata mesajı göster
             ModelState.AddModelError(string.Empty, "API üzerinden güncelleme yapılamadı. Lütfen bağlantınızı kontrol edin.");
             return View(model);
         }
+
         [HttpGet]
-        public async Task<IActionResult> AddDolly()
+        public IActionResult AddDolly()
         {
-           
             return View(new Dolly { IsActive = true });
         }
 
-        // POST: Veriyi API'ye gönderen metod
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> AddDolly(Dolly model)
         {
-            if (!ModelState.IsValid) return View(model);
-
-            // MUTLAKA await kullanmalısın
-            var isSuccess = await Models.DollyMethod.AddDolly(model);
-
-            if (isSuccess)
+            if (!ModelState.IsValid)
             {
-                return RedirectToAction("List");
+                return View(model);
+            }
+
+            // DÜZELTME: Servis tek tip parametresi bekliyor (<Dolly>)
+            var response = await _apiService.PostAsync<Dolly>("api/Dolly/Add", model);
+
+            if (response != null)
+            {
+                return RedirectToAction(nameof(List));
             }
 
             ModelState.AddModelError(string.Empty, "Ekleme işlemi başarısız oldu.");

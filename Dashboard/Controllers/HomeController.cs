@@ -1,50 +1,62 @@
 using ClosedXML.Excel;
 using Dashboard.DTO;
 using Dashboard.Models;
-using DocumentFormat.OpenXml.InkML;
+using Dashboard.Services;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using System.Diagnostics;
-
+using System.Security.Claims;
 
 namespace Dashboard.Controllers
 {
     public class HomeController : Controller
     {
+        private readonly IApiService _apiService;
         private readonly ILogger<HomeController> _logger;
 
-        public HomeController(ILogger<HomeController> logger)
+        public HomeController(IApiService apiService, ILogger<HomeController> logger)
         {
+            _apiService = apiService;
             _logger = logger;
         }
 
-        public IActionResult Index()
+        public async Task<IActionResult> Index()
         {
-            MultiModel multiModel = new MultiModel();
-            multiModel.nem = Models.NemMethod.GetAllNemMethod();
-            multiModel.Sicaklik = Models.SicaklikMethod.GetAllSicaklikMethod();
-            multiModel.bosDolu = Models.DoluBosMethod.GetAllDoluBosMethod();
-            multiModel.DollyList = Models.DollyMethod.GetAllDolly();
-            multiModel.gpsdatum = Models.GpsDatumMethod.GetAllGpsDatumMethod();
+            // Tüm istekler asenkron olarak paralel çaðrýlabilir
+            var nemTask = _apiService.GetAsync<List<Nem>>("api/Nem/Get");
+            var sicaklikTask = _apiService.GetAsync<List<Sicaklik>>("api/Sicaklik");
+            var dolubosTask = _apiService.GetAsync<List<BosDolu>>("api/DoluBos/Get");
+            var dollyTask = _apiService.GetAsync<List<Dolly>>("api/Dolly/Get");
+            var gpsTask = _apiService.GetAsync<List<Gpsdatum>>("api/Gps/Get");
+
+            await Task.WhenAll(nemTask, sicaklikTask, dolubosTask, dollyTask, gpsTask);
+
+            var multiModel = new MultiModel
+            {
+                nem = await nemTask ?? new List<Nem>(),
+                Sicaklik = await sicaklikTask ?? new List<Sicaklik>(),
+                bosDolu = await dolubosTask ?? new List<BosDolu>(),
+                DollyList = await dollyTask ?? new List<Dolly>(),
+                gpsdatum = await gpsTask ?? new List<Gpsdatum>()
+            };
+
             return View(multiModel);
         }
+
         [HttpGet]
-        public IActionResult ExportToExcel(int? dollyId, DateTime startDate, DateTime endDate)
+        public async Task<IActionResult> ExportToExcel(int? dollyId, DateTime startDate, DateTime endDate)
         {
-            // 1. Tarih aralýðý sýnýrlarýný ayarlayalým
             var startUtc = DateTime.SpecifyKind(startDate, DateTimeKind.Utc);
             var endUtc = DateTime.SpecifyKind(endDate, DateTimeKind.Utc).AddDays(1).AddTicks(-1);
 
-            // 2. Verileri doðrudan sizin projenizdeki Method'lar üzerinden çekiyoruz
-            var tumSicakliklar = Models.SicaklikMethod.GetAllSicaklikMethod() ?? new List<Sicaklik>();
-            var tumNemler = Models.NemMethod.GetAllNemMethod() ?? new List<Nem>();
-            var tumGpsler = Models.GpsDatumMethod.GetAllGpsDatumMethod() ?? new List<Gpsdatum>();
-            var tumDollyler = Models.DollyMethod.GetAllDolly() ?? new List<Dolly>();
+            var tumSicakliklar = await _apiService.GetAsync<List<Sicaklik>>("api/Sicaklik") ?? new List<Sicaklik>();
+            var tumNemler = await _apiService.GetAsync<List<Nem>>("api/Nem/Get") ?? new List<Nem>();
+            var tumGpsler = await _apiService.GetAsync<List<Gpsdatum>>("api/Gps/Get") ?? new List<Gpsdatum>();
+            var tumDollyler = await _apiService.GetAsync<List<Dolly>>("api/Dolly/Get") ?? new List<Dolly>();
 
-            // Dolly Id - Name eþleþmesi için sözlük (Dictionary)
             var dollyDict = tumDollyler.ToDictionary(x => x.Id, x => x.Name);
 
-            // 3. Çekilen listeleri verilen Filtrelere (DollyId ve Tarih) göre süzüyoruz
             var filteredSicaklik = tumSicakliklar
                 .Where(x => (!dollyId.HasValue || x.DollyId == dollyId) && x.Time >= startUtc && x.Time <= endUtc)
                 .OrderByDescending(x => x.Time)
@@ -60,10 +72,8 @@ namespace Dashboard.Controllers
                 .OrderByDescending(x => x.Time)
                 .ToList();
 
-            // 4. Excel Dosyasý Oluþturma (ClosedXML)
             using (var workbook = new XLWorkbook())
             {
-                // --- TAB 1: Sýcaklýk ---
                 var wsTemp = workbook.Worksheets.Add("Sýcaklýk Verileri");
                 wsTemp.Cell(1, 1).Value = "Dolly Adý";
                 wsTemp.Cell(1, 2).Value = "Tarih / Saat";
@@ -79,7 +89,6 @@ namespace Dashboard.Controllers
                 }
                 wsTemp.Columns().AdjustToContents();
 
-                // --- TAB 2: Nem ---
                 var wsHum = workbook.Worksheets.Add("Nem Verileri");
                 wsHum.Cell(1, 1).Value = "Dolly Adý";
                 wsHum.Cell(1, 2).Value = "Tarih / Saat";
@@ -95,7 +104,6 @@ namespace Dashboard.Controllers
                 }
                 wsHum.Columns().AdjustToContents();
 
-                // --- TAB 3: GPS Konum ---
                 var wsGps = workbook.Worksheets.Add("GPS Konum Verileri");
                 wsGps.Cell(1, 1).Value = "Dolly Adý";
                 wsGps.Cell(1, 2).Value = "Tarih / Saat";
@@ -113,7 +121,6 @@ namespace Dashboard.Controllers
                 }
                 wsGps.Columns().AdjustToContents();
 
-                // 5. Dosyayý indirilebilir formatta döndürüyoruz
                 using (var stream = new MemoryStream())
                 {
                     workbook.SaveAs(stream);
@@ -123,41 +130,19 @@ namespace Dashboard.Controllers
                 }
             }
         }
-        public IActionResult Privacy()
-        {
-            return View();
-        }
-        public IActionResult Deneme()
-        {
-            MultiModel multiModel = new MultiModel();
-            multiModel.nem = Models.NemMethod.GetAllNemMethod();
-            multiModel.Sicaklik = Models.SicaklikMethod.GetAllSicaklikMethod();
-            multiModel.bosDolu = Models.DoluBosMethod.GetAllDoluBosMethod();
-            multiModel.DollyList = Models.DollyMethod.GetAllDolly();
-            multiModel.gpsdatum = Models.GpsDatumMethod.GetAllGpsDatumMethod();
-            return View(multiModel);
-        }
-        [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
-        public IActionResult Error()
-        {
-            return View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
-        }
 
         [HttpGet]
-        public JsonResult GetLatestData(int id)
+        public async Task<JsonResult> GetLatestData(int id)
         {
-            // Belirli bir Dolly ID'sine ait en son kayýtlarý çekiyoruz
-            var sonSicaklik = Models.SicaklikMethod.GetAllSicaklikMethod()
-                                .Where(x => x.DollyId == id).OrderByDescending(x => x.Time).FirstOrDefault();
+            var sicakliklar = await _apiService.GetAsync<List<Sicaklik>>("api/Sicaklik") ?? new List<Sicaklik>();
+            var nemler = await _apiService.GetAsync<List<Nem>>("api/Nem/Get") ?? new List<Nem>();
+            var gpsler = await _apiService.GetAsync<List<Gpsdatum>>("api/Gps/Get") ?? new List<Gpsdatum>();
+            var durumlar = await _apiService.GetAsync<List<BosDolu>>("api/DoluBos/Get") ?? new List<BosDolu>();
 
-            var sonNem = Models.NemMethod.GetAllNemMethod()
-                                .Where(x => x.DollyId == id).OrderByDescending(x => x.Time).FirstOrDefault();
-
-            var sonGps = Models.GpsDatumMethod.GetAllGpsDatumMethod()
-                                .Where(x => x.DollyId == id).OrderByDescending(x => x.Time).FirstOrDefault();
-
-            var sonDurum = Models.DoluBosMethod.GetAllDoluBosMethod()
-                                .Where(x => x.DollyId == id).OrderByDescending(x => x.Time).FirstOrDefault();
+            var sonSicaklik = sicakliklar.Where(x => x.DollyId == id).OrderByDescending(x => x.Time).FirstOrDefault();
+            var sonNem = nemler.Where(x => x.DollyId == id).OrderByDescending(x => x.Time).FirstOrDefault();
+            var sonGps = gpsler.Where(x => x.DollyId == id).OrderByDescending(x => x.Time).FirstOrDefault();
+            var sonDurum = durumlar.Where(x => x.DollyId == id).OrderByDescending(x => x.Time).FirstOrDefault();
 
             return Json(new
             {
@@ -170,39 +155,69 @@ namespace Dashboard.Controllers
         }
 
         [HttpGet]
-        public IActionResult Login()
+        public async Task<IActionResult> GetHistoryData(int id, DateTime? start, DateTime? end)
         {
-            return View();
-        }
+            var queryParams = new Dictionary<string, string> { { "id", id.ToString() } };
+            if (start.HasValue) queryParams.Add("start", start.Value.ToString("yyyy-MM-ddTHH:mm:ss"));
+            if (end.HasValue) queryParams.Add("end", end.Value.ToString("yyyy-MM-ddTHH:mm:ss"));
 
-        [HttpPost]
-        public async Task<IActionResult> Login(string Username, string Password)
-        {
-            // Burada API'den veya DB'den doðrulama yapabilirsin
-            if (Username == "zkitapci" && Password == "7k#9P2x")
-            {
-                // Basit bir örnek: Cookie Authentication eklenebilir
-                return RedirectToAction("Index", "Home");
-            }
-
-            ViewBag.Error = "Kullanýcý adý veya þifre hatalý!";
-            return View();
+            var data = await _apiService.GetAsync<List<GPSHistoryModel>>("api/Gps/GetHistoryData", queryParams) ?? new List<GPSHistoryModel>();
+            return Json(data);
         }
 
         [HttpGet]
-        public IActionResult GetHistoryData(int id, DateTime? start, DateTime? end)
-        {
-            // Static metodu çaðýrýyoruz. 
-            // Tarihleri API'nin anlayacaðý ISO formatýna (yyyy-MM-ddTHH:mm:ss) çevirerek gönderiyoruz.
-            var data = Models.GpsDatumMethod.GetHistoryData(
-                id,
-                start?.ToString("yyyy-MM-ddTHH:mm:ss"),
-                end?.ToString("yyyy-MM-ddTHH:mm:ss")
-            );
+        public IActionResult Login() => View();
 
-            // API'den liste boþ gelse bile GetHistoryData metodun 'new List<GPSHistoryModel>()' döndüðü için 
-            // null hatasý almazsýn, boþ dizi [] döner.
-            return Json(data);
+        [HttpPost]
+        public async Task<IActionResult> Login(LoginViewModel model)
+        {
+            if (!ModelState.IsValid) return View(model);
+
+            // 1. API'ye login isteði atýlýr
+            var response = await _apiService.PostAsync<LoginResponseDto, LoginViewModel>("api/auth/login", model);
+
+            if (response != null && !string.IsNullOrEmpty(response.Token))
+            {
+                // 2. Claim'ler oluþturulur
+                var claims = new List<Claim>
+        {
+            new Claim(ClaimTypes.Name, response.Username),
+            new Claim(ClaimTypes.Role, response.Role),
+            new Claim("JWToken", response.Token) // API isteklerinde kullanýlacak JWT
+        };
+
+                var claimsIdentity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+                var authProperties = new AuthenticationProperties
+                {
+                    IsPersistent = model.RememberMe
+                };
+
+                // 3. Oturum Açýlýr (Cookie Yazýlýr)
+                await HttpContext.SignInAsync(
+                    CookieAuthenticationDefaults.AuthenticationScheme,
+                    new ClaimsPrincipal(claimsIdentity),
+                    authProperties);
+
+                return RedirectToAction("Index", "Home");
+            }
+
+            ModelState.AddModelError("", "Kullanýcý adý veya þifre hatalý.");
+            return View(model);
+        }
+
+        public class GPSHistoryModel
+        {
+            public double Lat { get; set; }
+            public double Lng { get; set; }
+            public string Time { get; set; }
+        }
+
+        public IActionResult Privacy() => View();
+
+        [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
+        public IActionResult Error()
+        {
+            return View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
         }
     }
 }
