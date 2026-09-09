@@ -1,6 +1,6 @@
 using Dashboard.Models;
+using Dashboard.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.StaticFiles; // 1. EKLEND�: Static files provider i�in gerekli
 using System.Xml;
 
@@ -9,35 +9,26 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.AddControllersWithViews();
 builder.Services.AddHttpClient();
-var oidcClientId = builder.Configuration["Authentication:Oidc:ClientId"];
-if (string.IsNullOrWhiteSpace(oidcClientId) || oidcClientId.StartsWith("<set-via-env:", StringComparison.Ordinal))
+builder.Services.Configure<LdapAuthenticationOptions>(builder.Configuration.GetSection("Authentication:Ldap"));
+builder.Services.AddScoped<ILdapAuthenticationService, LdapAuthenticationService>();
+builder.Services.AddDistributedMemoryCache();
+builder.Services.AddSession(options =>
 {
-    throw new InvalidOperationException("Authentication:Oidc:ClientId must be configured for THY OIDC login.");
-}
+    options.Cookie.HttpOnly = true;
+    options.Cookie.IsEssential = true;
+    options.Cookie.Name = ".THYLogger.Session";
+    options.IdleTimeout = TimeSpan.FromHours(8);
+});
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
-    options.DefaultChallengeScheme = OpenIdConnectDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = CookieAuthenticationDefaults.AuthenticationScheme;
 })
 .AddCookie(options =>
 {
     options.LoginPath = "/Home/Login";
-})
-.AddOpenIdConnect(options =>
-{
-    options.SignInScheme = CookieAuthenticationDefaults.AuthenticationScheme;
-    options.MetadataAddress = builder.Configuration["Authentication:Oidc:MetadataAddress"] ?? "https://oidctest.thy.com/idp/.well-known/openid-configurations";
-    options.ClientId = oidcClientId;
-    options.CallbackPath = builder.Configuration["Authentication:Oidc:CallbackPath"] ?? "/callback";
-    options.ResponseType = "code";
-    options.UsePkce = true;
-    options.SaveTokens = true;
-    options.GetClaimsFromUserInfoEndpoint = true;
-
-    options.Scope.Clear();
-    options.Scope.Add("openid");
-    options.Scope.Add("profile");
-    options.Scope.Add("email");
+    options.ExpireTimeSpan = TimeSpan.FromHours(8);
+    options.SlidingExpiration = true;
 });
 builder.Services.AddAuthorization(options =>
 {
@@ -66,6 +57,7 @@ app.UseStaticFiles(new StaticFileOptions
 });
 
 app.UseRouting();
+app.UseSession();
 
 app.UseAuthentication();
 app.UseAuthorization();

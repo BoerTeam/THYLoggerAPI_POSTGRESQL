@@ -31,6 +31,13 @@ window.colors = {
 };
 (function (window, document, $) {
   'use strict';
+
+  // Check if jQuery is loaded
+  if (typeof $ === 'undefined') {
+    console.error('app.js requires jQuery to be loaded first');
+    return;
+  }
+
   var $html = $('html');
   var $body = $('body');
   var $textcolor = '#4e5154';
@@ -52,6 +59,11 @@ window.colors = {
     var rtl;
     var compactMenu = false;
 
+    // Initialize $.app at the very beginning to prevent undefined errors
+    $.app = $.app || {};
+    $.app.menu = $.app.menu || null;
+    $.app.nav = $.app.nav || null;
+
     if ($body.hasClass('menu-collapsed') || localStorage.getItem('menuCollapsed') === 'true') {
       compactMenu = true;
     }
@@ -64,18 +76,23 @@ window.colors = {
       $html.removeClass('loading').addClass('loaded');
     }, 1200);
 
-    $.app.menu.init(compactMenu);
+    // Initialize menu only if $.app.menu is defined
+    if ($.app.menu && typeof $.app.menu.init === 'function') {
+      $.app.menu.init(compactMenu);
+    }
 
     // Navigation configurations
     var config = {
       speed: 300 // set speed to expand / collapse menu
     };
-    if ($.app.nav.initialized === false) {
+    if ($.app.nav && typeof $.app.nav.init === 'function' && $.app.nav.initialized === false) {
       $.app.nav.init(config);
     }
 
     Unison.on('change', function (bp) {
-      $.app.menu.change(compactMenu);
+      if ($.app.menu && typeof $.app.menu.change === 'function') {
+        $.app.menu.change(compactMenu);
+      }
     });
 
     // Tooltip Initialization

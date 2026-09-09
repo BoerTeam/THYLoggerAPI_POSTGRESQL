@@ -1,14 +1,16 @@
 using ClosedXML.Excel;
 using Dashboard.DTO;
 using Dashboard.Models;
+using Dashboard.Services;
 using DocumentFormat.OpenXml.InkML;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Diagnostics;
+using System.Security.Claims;
+using System.Security.Cryptography;
 
 
 namespace Dashboard.Controllers
@@ -17,10 +19,14 @@ namespace Dashboard.Controllers
     public class HomeController : Controller
     {
         private readonly ILogger<HomeController> _logger;
+        private readonly ILdapAuthenticationService _ldapAuthenticationService;
 
-        public HomeController(ILogger<HomeController> logger)
+        public HomeController(
+            ILogger<HomeController> logger,
+            ILdapAuthenticationService ldapAuthenticationService)
         {
             _logger = logger;
+            _ldapAuthenticationService = ldapAuthenticationService;
         }
 
         public IActionResult Index()
@@ -183,38 +189,82 @@ namespace Dashboard.Controllers
                 return RedirectToAction("Index", "Home");
             }
 
-            var fallbackUrl = Url.Action("Index", "Home");
-            ViewData["ReturnUrl"] = !string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl)
-                ? returnUrl
-                : fallbackUrl;
-            return View();
+            return View(CreateLoginViewModel(returnUrl));
         }
 
         [AllowAnonymous]
         [HttpPost]
         [ValidateAntiForgeryToken]
         [ActionName("Login")]
-        public IActionResult LoginPost(string? returnUrl = null)
+        public async Task<IActionResult> LoginPost(LoginViewModel model)
         {
-            var redirectUrl = Url.Action("Index", "Home") ?? "/";
-            if (!string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl))
+            if (User.Identity?.IsAuthenticated == true)
             {
-                redirectUrl = returnUrl;
+                return RedirectToAction("Index", "Home");
             }
 
-            return Challenge(
-                new AuthenticationProperties { RedirectUri = redirectUrl },
-                OpenIdConnectDefaults.AuthenticationScheme);
+            model.ReturnUrl = ResolveReturnUrl(model.ReturnUrl);
+
+            if (!ModelState.IsValid)
+            {
+                return View(model);
+            }
+
+            var authenticationResult = await _ldapAuthenticationService.AuthenticateAsync(model.Username, model.Password);
+            if (!authenticationResult.Succeeded)
+            {
+                ModelState.AddModelError(string.Empty, authenticationResult.ErrorMessage ?? "Giriş başarısız oldu.");
+                model.Password = string.Empty;
+                return View(model);
+            }
+
+            var sessionToken = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+            HttpContext.Session.SetString("AuthSessionToken", sessionToken);
+
+            var claims = new List<Claim>
+            {
+                new(ClaimTypes.NameIdentifier, authenticationResult.Username),
+                new(ClaimTypes.Name, authenticationResult.DisplayName ?? authenticationResult.Username),
+                new("session_token", sessionToken)
+            };
+
+            if (!string.IsNullOrWhiteSpace(authenticationResult.Email))
+            {
+                claims.Add(new Claim(ClaimTypes.Email, authenticationResult.Email));
+            }
+
+            var principal = new ClaimsPrincipal(
+                new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme));
+
+            var authenticationProperties = new AuthenticationProperties
+            {
+                IsPersistent = false,
+                RedirectUri = model.ReturnUrl
+            };
+            authenticationProperties.StoreTokens(new[]
+            {
+                new AuthenticationToken
+                {
+                    Name = "session_token",
+                    Value = sessionToken
+                }
+            });
+
+            await HttpContext.SignInAsync(
+                CookieAuthenticationDefaults.AuthenticationScheme,
+                principal,
+                authenticationProperties);
+
+            return LocalRedirect(model.ReturnUrl ?? "/");
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public IActionResult Logout()
+        public async Task<IActionResult> Logout()
         {
-            return SignOut(
-                new AuthenticationProperties { RedirectUri = Url.Action("Login", "Home") ?? "/" },
-                CookieAuthenticationDefaults.AuthenticationScheme,
-                OpenIdConnectDefaults.AuthenticationScheme);
+            HttpContext.Session.Clear();
+            await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            return RedirectToAction("Login", "Home");
         }
 
         [HttpGet]
@@ -231,6 +281,22 @@ namespace Dashboard.Controllers
             // API'den liste bo� gelse bile GetHistoryData metodun 'new List<GPSHistoryModel>()' d�nd��� i�in 
             // null hatas� almazs�n, bo� dizi [] d�ner.
             return Json(data);
+        }
+
+        private LoginViewModel CreateLoginViewModel(string? returnUrl)
+        {
+            return new LoginViewModel
+            {
+                ReturnUrl = ResolveReturnUrl(returnUrl)
+            };
+        }
+
+        private string ResolveReturnUrl(string? returnUrl)
+        {
+            var fallbackUrl = Url.Action("Index", "Home") ?? "/";
+            return !string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl)
+                ? returnUrl
+                : fallbackUrl;
         }
     }
 }
