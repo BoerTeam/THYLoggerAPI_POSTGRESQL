@@ -17,7 +17,28 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.SlidingExpiration = true;
     });
 
-// 3. HttpContextAccess - ApiService içinde Token okuyabilmek için þart
+// 2.1 Role ve Permission Tabanlý Policy Tanýmlarý (Tüm Controller'lar Ýçin)
+builder.Services.AddAuthorization(options =>
+{
+    // Rol bazlý politika
+    options.AddPolicy("AdminOnly", policy => policy.RequireRole("Admin"));
+
+    // Ýzin (Permission) bazlý politikalar
+    options.AddPolicy("DollyView", policy => policy.RequireClaim("Permission", "DOLLY_VIEW"));
+    options.AddPolicy("DollyEdit", policy => policy.RequireClaim("Permission", "DOLLY_EDIT"));
+    options.AddPolicy("DollyAdd", policy => policy.RequireClaim("Permission", "DOLLY_ADD"));
+    options.AddPolicy("ExportExcel", policy => policy.RequireClaim("Permission", "EXPORT_EXCEL"));
+
+    // Kullanýcý & Rol Yönetimi Politikasý: Hem Admin rolüne hem de ROLE_ADMIN iznine sahip olanlar girebilsin
+    options.AddPolicy("UserView", policy =>
+        policy.RequireAssertion(context =>
+            context.User.IsInRole("Admin") ||
+            context.User.HasClaim(c => c.Type == "Permission" && c.Value == "ROLE_ADMIN")
+        )
+    );
+});
+
+// 3. HttpContextAccessor - ApiService içinde Token okuyabilmek için þart
 builder.Services.AddHttpContextAccessor();
 
 // 4. Typed HttpClient ve ApiService Kaydý
@@ -49,12 +70,12 @@ app.UseStaticFiles(new StaticFileOptions
 
 app.UseRouting();
 
-// 7. Kimlik Doðrulama ve Yetkilendirme (Sýralama Önemli!)
+// 7. Kimlik Doðrulama ve Yetkilendirme
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllerRoute(
     name: "default",
-    pattern: "{controller=Home}/{action=Login}/{id?}");
+    pattern: "{controller=Home}/{action=Index}/{id?}");
 
 app.Run();

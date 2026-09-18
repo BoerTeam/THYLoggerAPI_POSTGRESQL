@@ -97,5 +97,57 @@ namespace THYLoggerAPI_POSTGRESQL.Services
                 throw;
             }
         }
+        // Kullanıcının mevcut ve tüm rollerini getiren metod (Dashboard ekranı için)
+        public async Task<(bool IsSuccess, bool IsNotFound, string? ErrorMessage, UserRoleDetailDto? Data)> GetUserRolesForAssignAsync(int userId)
+        {
+            if (userId <= 0)
+            {
+                _logger.LogWarning("Geçersiz kullanıcı ID'si gönderildi. UserId: {UserId}", userId);
+                return (false, false, "Geçersiz kullanıcı bilgisi.", null);
+            }
+
+            _logger.LogInformation("Kullanıcı rol detayları getiriliyor. UserId: {UserId}", userId);
+
+            try
+            {
+                var user = await _context.Users
+                    .AsNoTracking()
+                    .Include(u => u.UserRoles)
+                    .FirstOrDefaultAsync(u => u.Id == userId);
+
+                if (user == null)
+                {
+                    _logger.LogWarning("Kullanıcı bulunamadı! UserId: {UserId}", userId);
+                    return (false, true, "Kullanıcı bulunamadı.", null);
+                }
+
+                var allRoles = await _context.Roles
+                    .AsNoTracking()
+                    .Where(r => r.IsActive)
+                    .ToListAsync();
+
+                var userRoleIds = user.UserRoles.Select(ur => ur.RoleId).ToList();
+
+                var result = new UserRoleDetailDto
+                {
+                    UserId = user.Id,
+                    Username = user.UserName,
+                    Roles = allRoles.Select(r => new RoleItemDto
+                    {
+                        RoleId = r.Id,
+                        RoleName = r.Name,
+                        IsAssigned = userRoleIds.Contains(r.Id)
+                    }).ToList()
+                };
+
+                _logger.LogInformation("Kullanıcı rol detayları başarıyla getirildi. UserId: {UserId}", userId);
+                return (true, false, null, result);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Kullanıcı rol detayları çekilirken bir hata oluştu! UserId: {UserId}", userId);
+                throw;
+            }
+        }
     }
 }

@@ -50,5 +50,31 @@ namespace THYLoggerAPI_POSTGRESQL.Controllers
                 return StatusCode(500, "Sayfa oluşturulurken sunucu hatası oluştu: " + ex.Message);
             }
         }
+        // GET: api/Pages/user-pages/5 VEYA api/Pages/GetUserPages/5
+        [HttpGet("user-pages/{userId}")]
+        [HttpGet("GetUserPages/{userId}")]
+        public async Task<IActionResult> GetUserPages(int userId)
+        {
+            try
+            {
+                var result = await _pageService.GetUserPagesAsync(userId);
+
+                if (!result.IsSuccess)
+                {
+                    if (result.IsNotFound)
+                    {
+                        return NotFound(new { message = result.ErrorMessage });
+                    }
+
+                    return BadRequest(result.ErrorMessage);
+                }
+
+                return Ok(result.Data);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, "Kullanıcı sayfaları alınırken bir sunucu hatası oluştu: " + ex.Message);
+            }
+        }
     }
 }

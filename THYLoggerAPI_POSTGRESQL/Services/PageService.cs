@@ -81,5 +81,60 @@ namespace THYLoggerAPI_POSTGRESQL.Services
                 throw;
             }
         }
+        // 3. Giriş Yapan Kullanıcının Yetkili Olduğu Sayfaları Listeleme (Dinamik Menü İçin)
+        public async Task<(bool IsSuccess, bool IsNotFound, string? ErrorMessage, List<PageListDto>? Data)> GetUserPagesAsync(int userId)
+        {
+            if (userId <= 0)
+            {
+                _logger.LogWarning("Geçersiz kullanıcı ID'si gönderildi. UserId: {UserId}", userId);
+                return (false, false, "Geçersiz kullanıcı bilgisi.", null);
+            }
+
+            _logger.LogInformation("Kullanıcıya özel menü sayfaları çekiliyor. UserId: {UserId}", userId);
+
+            try
+            {
+                var userExists = await _context.Users.AnyAsync(u => u.Id == userId);
+                if (!userExists)
+                {
+                    _logger.LogWarning("Kullanıcı bulunamadı. UserId: {UserId}", userId);
+                    return (false, true, "Kullanıcı bulunamadı.", null);
+                }
+
+                // 1. Kullanıcının rollerinden elde edilen izin kodlarını (Permission.Code) çek
+                var userPermissionCodes = await _context.UserRoles
+                    .Where(ur => ur.UserId == userId)
+                    .SelectMany(ur => ur.Role.RolePermissions)
+                    .Select(rp => rp.Permission.Code)
+                    .Distinct()
+                    .ToListAsync();
+
+                // 2. Bu izin kodlarıyla eşleşen aktif sayfaları çek ve sırala
+                var userPages = await _context.Pages
+                    .AsNoTracking()
+                    .Where(p => p.IsActive && userPermissionCodes.Contains(p.PermissionCode))
+                    .OrderBy(p => p.Order)
+                    .Select(p => new PageListDto
+                    {
+                        Id = p.Id,
+                        Name = p.Name,
+                        Route = p.Route,
+                        PermissionCode = p.PermissionCode,
+                        Icon = p.Icon,
+                        Order = p.Order,
+                        IsActive = p.IsActive
+                    })
+                    .ToListAsync();
+
+                _logger.LogInformation("Kullanıcı sayfaları başarıyla çekildi. UserId: {UserId}, Sayfa Sayısı: {PageCount}", userId, userPages.Count);
+
+                return (true, false, null, userPages);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Kullanıcı sayfaları çekilirken sunucu hatası oluştu! UserId: {UserId}", userId);
+                throw;
+            }
+        }
     }
 }

@@ -16,8 +16,8 @@ namespace THYLoggerAPI_POSTGRESQL.Services
             _logger = logger;
         }
 
-        // Tüm Rolleri Getirir
-        public async Task<List<Role>> GetAllRolesAsync()
+        // Tüm Rolleri ve İzinlerini DTO olarak güvenli getirir
+        public async Task<List<RoleDto>> GetAllRolesAsync()
         {
             _logger.LogInformation("Tüm sistem rolleri listeleniyor.");
 
@@ -27,9 +27,26 @@ namespace THYLoggerAPI_POSTGRESQL.Services
                     .AsNoTracking()
                     .Include(r => r.RolePermissions)
                         .ThenInclude(rp => rp.Permission)
+                    .Select(r => new RoleDto
+                    {
+                        Id = r.Id,
+                        Name = r.Name,
+                        Description = r.Description,
+                        IsActive = r.IsActive,
+                        RolePermissions = r.RolePermissions.Select(rp => new RolePermissionDto
+                        {
+                            RoleId = rp.RoleId,
+                            PermissionId = rp.PermissionId,
+                            Permission = rp.Permission != null ? new PermissionDto
+                            {
+                                Id = rp.Permission.Id,
+                                Name = rp.Permission.Name,
+                                Code = rp.Permission.Code
+                            } : null
+                        }).ToList()
+                    })
                     .ToListAsync();
 
-                _logger.LogInformation("Sistem rolleri başarıyla getirildi. Toplam Rol Sayısı: {RoleCount}", roles.Count);
                 return roles;
             }
             catch (Exception ex)
@@ -39,20 +56,21 @@ namespace THYLoggerAPI_POSTGRESQL.Services
             }
         }
 
-        // Tüm İzinleri (Permissions) Getirir
-        public async Task<List<Permission>> GetAllPermissionsAsync()
+        // Tüm İzinleri Getirir
+        public async Task<List<PermissionDto>> GetAllPermissionsAsync()
         {
-            _logger.LogInformation("Tüm sistem izinleri (Permissions) listeleniyor.");
-
             try
             {
-                var permissions = await _context.Permissions
+                return await _context.Permissions
                     .AsNoTracking()
                     .Where(p => p.IsActive)
+                    .Select(p => new PermissionDto
+                    {
+                        Id = p.Id,
+                        Name = p.Name,
+                        Code = p.Code
+                    })
                     .ToListAsync();
-
-                _logger.LogInformation("Sistem izinleri başarıyla getirildi. Toplam İzin Sayısı: {PermissionCount}", permissions.Count);
-                return permissions;
             }
             catch (Exception ex)
             {
@@ -61,17 +79,13 @@ namespace THYLoggerAPI_POSTGRESQL.Services
             }
         }
 
-        // Yeni Rol Oluşturur ve İzinlerini Bağlar
+        // Yeni Rol Oluşturur
         public async Task<(bool IsSuccess, string? ErrorMessage, object? ResponseData)> CreateRoleAsync(CreateRoleDto dto)
         {
             if (dto == null || string.IsNullOrWhiteSpace(dto.Name))
             {
-                _logger.LogWarning("Geçersiz rol oluşturma isteği gönderildi. Rol adı boş olamaz.");
                 return (false, "Rol adı boş olamaz.", null);
             }
-
-            _logger.LogInformation("Yeni rol oluşturma işlemi başlatıldı. Rol Adı: {RoleName}, Atanacak İzin Sayısı: {PermissionCount}",
-                dto.Name, dto.PermissionIds?.Count ?? 0);
 
             try
             {
@@ -98,15 +112,11 @@ namespace THYLoggerAPI_POSTGRESQL.Services
                     await _context.SaveChangesAsync();
                 }
 
-                _logger.LogInformation("Yeni rol başarıyla oluşturuldu ve izinler bağlandı. Rol Adı: {RoleName}", dto.Name);
-
-                // Orijinal Controller response çıktısı
-                var response = new { message = "Rol başarıyla oluşturuldu." };
-                return (true, null, response);
+                return (true, null, new { message = "Rol başarıyla oluşturuldu." });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Yeni rol oluşturulurken bir hata oluştu! Rol Adı: {RoleName}", dto.Name);
+                _logger.LogError(ex, "Yeni rol oluşturulurken hata oluştu! Rol Adı: {RoleName}", dto.Name);
                 throw;
             }
         }

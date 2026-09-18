@@ -1,0 +1,110 @@
+﻿@model List<Dashboard.Controllers.RoleItemDto>
+@{
+    ViewData["Title"] = "Rol ve Yetki Yönetimi";
+    var permissions = ViewBag.Permissions as List<Dashboard.Controllers.PermissionItemDto> ?? new List<Dashboard.Controllers.PermissionItemDto>();
+    var roles = Model ?? new List<Dashboard.Controllers.RoleItemDto>();
+}
+
+<div class="content-body">
+    <div class="row">
+        <!-- Rol Oluşturma Formu -->
+        <div class="col-md-5">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="card-title">Yeni Rol ve İzin Tanımla</h4>
+                </div>
+                <div class="card-body">
+                    <form asp-controller="RoleManagement" asp-action="CreateRole" method="post">
+                        <div class="mb-1">
+                            <label class="form-label">Rol Adı</label>
+                            <input type="text" name="Name" class="form-control" required placeholder="Örn: Operatör" />
+                        </div>
+                        <div class="mb-1">
+                            <label class="form-label">Açıklama</label>
+                            <input type="text" name="Description" class="form-control" placeholder="Rol açıklaması giriniz" />
+                        </div>
+
+                        <div class="mb-1">
+                            <label class="form-label fw-bolder">Atanacak İzinler</label>
+                            <div class="border p-1 rounded" style="max-height: 250px; overflow-y: auto;">
+                                @if (permissions.Any())
+                                {
+                                    @foreach (var perm in permissions)
+                                    {
+                                        <div class="form-check mb-50">
+                                            <input class="form-check-input" type="checkbox" name="PermissionIds" value="@perm.Id" id="perm-@perm.Id">
+                                            <label class="form-check-label" for="perm-@perm.Id">
+                                                @perm.Name <small class="text-muted">(@perm.Code)</small>
+                                            </label>
+                                        </div>
+                                    }
+                                }
+                                else
+                                {
+                                    <span class="text-muted small">Tanımlı izin bulunamadı.</span>
+                                }
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary w-100 mt-1">Rolü Oluştur</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mevcut Rol Listesi ve Bağlı İzinler -->
+        <div class="col-md-7">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="card-title">Sistemdeki Roller</h4>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Rol Adı</th>
+                                    <th>Açıklama</th>
+                                    <th>Tanımlı İzinler</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (roles.Any())
+                                {
+                                    @foreach (var role in roles)
+                                    {
+                                        <tr>
+                                            <td>
+                                                <span class="badge bg-light-primary fw-bolder fs-6">@role.Name</span>
+                                            </td>
+                                            <td>@role.Description</td>
+                                            <td>
+                                                @if (role.RolePermissions != null && role.RolePermissions.Any())
+                                                {
+                                                    @foreach (var rp in role.RolePermissions)
+                                                    {
+                                                        <span class="badge bg-light-secondary me-25 mb-25">@(rp.Permission?.Name ?? "İzin")</span>
+                                                    }
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted small">İzin atanmamış</span>
+                                                }
+                                            </td>
+                                        </tr>
+                                    }
+                                }
+                                else
+                                {
+                                    <tr>
+                                        <td colspan="3" class="text-center text-muted">Mevcut rol bulunamadı.</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

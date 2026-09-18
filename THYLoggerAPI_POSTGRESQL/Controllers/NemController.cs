@@ -15,8 +15,7 @@ namespace THYLoggerAPI_POSTGRESQL.Controllers
             _nemService = nemService;
         }
 
-        // GET: api/Nem
-        [HttpGet]
+        [HttpGet("GetAll")]
         public async Task<IActionResult> GetAll()
         {
             try
@@ -30,8 +29,6 @@ namespace THYLoggerAPI_POSTGRESQL.Controllers
             }
         }
 
-        // POST: api/Nem  VEYA  POST: api/Nem/Add
-        [HttpPost]
         [HttpPost("Add")]
         public async Task<IActionResult> Add([FromBody] Nem entity)
         {

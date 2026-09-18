@@ -1,10 +1,12 @@
 ﻿using Dashboard.DTO;
 using Dashboard.Models;
 using Dashboard.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Dashboard.Controllers
 {
+    [Authorize(Policy = "DollyView")]
     public class DollyController : Controller
     {
         private readonly IApiService _apiService;
@@ -17,18 +19,19 @@ namespace Dashboard.Controllers
         [HttpGet]
         public async Task<IActionResult> Index()
         {
-            var dollyList = await _apiService.GetAsync<List<Dolly>>("api/Dolly/Get") ?? new List<Dolly>();
+            var dollyList = await _apiService.GetAsync<List<Dolly>>("api/Dolly/GetAll") ?? new List<Dolly>();
             return View(dollyList);
         }
 
         [HttpGet]
         public async Task<IActionResult> List()
         {
-            var dollyList = await _apiService.GetAsync<List<Dolly>>("api/Dolly/Get") ?? new List<Dolly>();
+            var dollyList = await _apiService.GetAsync<List<Dolly>>("api/Dolly/GetAll") ?? new List<Dolly>();
             return View(dollyList);
         }
 
         [HttpGet]
+        [Authorize(Policy = "DollyEdit")]
         public async Task<IActionResult> Edit(int id)
         {
             var dolly = await _apiService.GetAsync<Dolly>($"api/Dolly/GetById/{id}");
@@ -42,6 +45,7 @@ namespace Dashboard.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [Authorize(Policy = "DollyEdit")]
         public async Task<IActionResult> Edit(Dolly model)
         {
             if (!ModelState.IsValid)
@@ -49,10 +53,8 @@ namespace Dashboard.Controllers
                 return View(model);
             }
 
-            // DÜZELTME: Servis tek tip parametresi bekliyor (<Dolly>)
-            var response = await _apiService.PutAsync<Dolly>("api/Dolly/Update", model);
+            var response = await _apiService.PutAsync<Dolly>($"api/Dolly/Update/{model.Id}", model);
 
-            // Eğer API'den dönen yanıt bir başarı durumu içeriyorsa veya null değilse başarılı sayıyoruz
             if (response != null)
             {
                 return RedirectToAction(nameof(List));
@@ -63,6 +65,7 @@ namespace Dashboard.Controllers
         }
 
         [HttpGet]
+        [Authorize(Policy = "DollyAdd")]
         public IActionResult AddDolly()
         {
             return View(new Dolly { IsActive = true });
@@ -70,14 +73,18 @@ namespace Dashboard.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [Authorize(Policy = "DollyAdd")]
         public async Task<IActionResult> AddDolly(Dolly model)
         {
+            ModelState.Remove("Id");
+            ModelState.Remove("CreatedAt");
+            ModelState.Remove("UpdatedAt");
+
             if (!ModelState.IsValid)
             {
                 return View(model);
             }
 
-            // DÜZELTME: Servis tek tip parametresi bekliyor (<Dolly>)
             var response = await _apiService.PostAsync<Dolly>("api/Dolly/Add", model);
 
             if (response != null)
@@ -85,7 +92,7 @@ namespace Dashboard.Controllers
                 return RedirectToAction(nameof(List));
             }
 
-            ModelState.AddModelError(string.Empty, "Ekleme işlemi başarısız oldu.");
+            ModelState.AddModelError(string.Empty, "API tarafında ekleme işlemi başarısız oldu.");
             return View(model);
         }
     }

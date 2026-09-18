@@ -1,0 +1,40 @@
+﻿@model Dashboard.DTO.UserRoleDetailDto
+
+@{
+    ViewData["Title"] = "Rol Atama";
+}
+
+<div class="container mt-4">
+    <div class="card shadow-sm">
+        <div class="card-header bg-dark text-white">
+            <h5 class="mb-0">Kullanıcı Rol Düzenleme: <u>@Model.Username</u></h5>
+        </div>
+        <form asp-action="AssignRoles" method="post">
+            <input type="hidden" asp-for="UserId" />
+            <input type="hidden" asp-for="Username" />
+
+            <div class="card-body">
+                <p class="text-muted">Kullanıcının sahip olmasını istediğiniz rolleri işaretleyip kaydedin:</p>
+                <div class="row">
+                    @for (int i = 0; i < Model.Roles.Count; i++)
+                    {
+                        <div class="col-md-4 mb-3">
+                            <div class="form-check border p-3 rounded shadow-sm">
+                                <input type="hidden" asp-for="Roles[i].RoleId" />
+                                <input type="hidden" asp-for="Roles[i].RoleName" />
+                                <input class="form-check-input" type="checkbox" asp-for="Roles[i].IsAssigned" id="role_@Model.Roles[i].RoleId">
+                                <label class="form-check-label fw-bold ms-2" for="role_@Model.Roles[i].RoleId">
+                                    @Model.Roles[i].RoleName
+                                </label>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+            <div class="card-footer text-end">
+                <a asp-action="Index" class="btn btn-secondary me-2">İptal</a>
+                <button type="submit" class="btn btn-success">Değişiklikleri Kaydet</button>
+            </div>
+        </form>
+    </div>
+</div>

@@ -15,8 +15,7 @@ namespace THYLoggerAPI_POSTGRESQL.Controllers
             _doluBosService = doluBosService;
         }
 
-        // GET: api/DoluBos
-        [HttpGet]
+        [HttpGet("GetAll")]
         public async Task<IActionResult> GetAll()
         {
             try
@@ -30,8 +29,6 @@ namespace THYLoggerAPI_POSTGRESQL.Controllers
             }
         }
 
-        // POST: api/DoluBos  VEYA  POST: api/DoluBos/Add
-        [HttpPost]
         [HttpPost("Add")]
         public async Task<IActionResult> Add([FromBody] BosDolu entity)
         {

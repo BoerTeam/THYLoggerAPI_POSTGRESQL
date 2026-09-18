@@ -4,12 +4,14 @@ using Dashboard.Models;
 using Dashboard.Services;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Diagnostics;
 using System.Security.Claims;
 
 namespace Dashboard.Controllers
 {
+    [Authorize]
     public class HomeController : Controller
     {
         private readonly IApiService _apiService;
@@ -21,14 +23,14 @@ namespace Dashboard.Controllers
             _logger = logger;
         }
 
+        [Authorize(Policy = "DollyView")]
         public async Task<IActionResult> Index()
         {
-            // Tüm istekler asenkron olarak paralel çaðrýlabilir
-            var nemTask = _apiService.GetAsync<List<Nem>>("api/Nem/Get");
-            var sicaklikTask = _apiService.GetAsync<List<Sicaklik>>("api/Sicaklik");
-            var dolubosTask = _apiService.GetAsync<List<BosDolu>>("api/DoluBos/Get");
-            var dollyTask = _apiService.GetAsync<List<Dolly>>("api/Dolly/Get");
-            var gpsTask = _apiService.GetAsync<List<Gpsdatum>>("api/Gps/Get");
+            var nemTask = _apiService.GetAsync<List<Nem>>("api/Nem/GetAll");
+            var sicaklikTask = _apiService.GetAsync<List<Sicaklik>>("api/Sicaklik/GetAll");
+            var dolubosTask = _apiService.GetAsync<List<BosDolu>>("api/DoluBos/GetAll");
+            var dollyTask = _apiService.GetAsync<List<Dolly>>("api/Dolly/GetAll");
+            var gpsTask = _apiService.GetAsync<List<Gpsdatum>>("api/Gps/GetAll");
 
             await Task.WhenAll(nemTask, sicaklikTask, dolubosTask, dollyTask, gpsTask);
 
@@ -45,6 +47,7 @@ namespace Dashboard.Controllers
         }
 
         [HttpGet]
+        [Authorize(Policy = "ExportExcel")]
         public async Task<IActionResult> ExportToExcel(int? dollyId, DateTime startDate, DateTime endDate)
         {
             var startUtc = DateTime.SpecifyKind(startDate, DateTimeKind.Utc);
@@ -132,6 +135,7 @@ namespace Dashboard.Controllers
         }
 
         [HttpGet]
+        [Authorize(Policy = "DollyView")]
         public async Task<JsonResult> GetLatestData(int id)
         {
             var sicakliklar = await _apiService.GetAsync<List<Sicaklik>>("api/Sicaklik") ?? new List<Sicaklik>();
@@ -155,6 +159,7 @@ namespace Dashboard.Controllers
         }
 
         [HttpGet]
+        [Authorize(Policy = "DollyView")]
         public async Task<IActionResult> GetHistoryData(int id, DateTime? start, DateTime? end)
         {
             var queryParams = new Dictionary<string, string> { { "id", id.ToString() } };
@@ -166,25 +171,52 @@ namespace Dashboard.Controllers
         }
 
         [HttpGet]
-        public IActionResult Login() => View();
+        [AllowAnonymous]
+        public IActionResult Login()
+        {
+            if (User.Identity?.IsAuthenticated == true)
+            {
+                return RedirectToAction("Index", "Home");
+            }
+            return View();
+        }
 
         [HttpPost]
+        [AllowAnonymous]
         public async Task<IActionResult> Login(LoginViewModel model)
         {
             if (!ModelState.IsValid) return View(model);
 
-            // 1. API'ye login isteði atýlýr
             var response = await _apiService.PostAsync<LoginResponseDto, LoginViewModel>("api/auth/login", model);
 
-            if (response != null && !string.IsNullOrEmpty(response.Token))
+            if (response != null && response.IsSuccess)
             {
-                // 2. Claim'ler oluþturulur
                 var claims = new List<Claim>
-        {
-            new Claim(ClaimTypes.Name, response.Username),
-            new Claim(ClaimTypes.Role, response.Role),
-            new Claim("JWToken", response.Token) // API isteklerinde kullanýlacak JWT
-        };
+                {
+                    new Claim(ClaimTypes.NameIdentifier, response.UserId.ToString()),
+                    new Claim(ClaimTypes.Name, response.UserName)
+                };
+
+                if (!string.IsNullOrEmpty(response.Token))
+                {
+                    claims.Add(new Claim("JWToken", response.Token));
+                }
+
+                if (response.Roles != null)
+                {
+                    foreach (var role in response.Roles)
+                    {
+                        claims.Add(new Claim(ClaimTypes.Role, role));
+                    }
+                }
+
+                if (response.Permissions != null)
+                {
+                    foreach (var perm in response.Permissions)
+                    {
+                        claims.Add(new Claim("Permission", perm));
+                    }
+                }
 
                 var claimsIdentity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
                 var authProperties = new AuthenticationProperties
@@ -192,7 +224,6 @@ namespace Dashboard.Controllers
                     IsPersistent = model.RememberMe
                 };
 
-                // 3. Oturum Açýlýr (Cookie Yazýlýr)
                 await HttpContext.SignInAsync(
                     CookieAuthenticationDefaults.AuthenticationScheme,
                     new ClaimsPrincipal(claimsIdentity),
@@ -201,8 +232,21 @@ namespace Dashboard.Controllers
                 return RedirectToAction("Index", "Home");
             }
 
-            ModelState.AddModelError("", "Kullanýcý adý veya þifre hatalý.");
+            ModelState.AddModelError("", response?.Message ?? "Kullanýcý adý veya þifre hatalý.");
             return View(model);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> Logout()
+        {
+            await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            return RedirectToAction("Login", "Home");
+        }
+
+        [AllowAnonymous]
+        public IActionResult AccessDenied()
+        {
+            return View();
         }
 
         public class GPSHistoryModel

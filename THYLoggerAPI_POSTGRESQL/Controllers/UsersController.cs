@@ -30,6 +30,33 @@ namespace THYLoggerAPI_POSTGRESQL.Controllers
             }
         }
 
+        // GET: api/Users/5/roles VEYA api/Users/GetUserRoles/5
+        [HttpGet("{id}/roles")]
+        [HttpGet("GetUserRoles/{id}")]
+        public async Task<IActionResult> GetUserRoles(int id)
+        {
+            try
+            {
+                var result = await _userService.GetUserRolesForAssignAsync(id);
+
+                if (!result.IsSuccess)
+                {
+                    if (result.IsNotFound)
+                    {
+                        return NotFound(new { message = result.ErrorMessage });
+                    }
+
+                    return BadRequest(result.ErrorMessage);
+                }
+
+                return Ok(result.Data);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, "Kullanıcı rol detayları alınırken bir sunucu hatası oluştu: " + ex.Message);
+            }
+        }
+
         // POST: api/Users/assign-roles VEYA POST: api/Users/AssignRoles
         [HttpPost("assign-roles")]
         [HttpPost("AssignRoles")]

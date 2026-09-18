@@ -6,22 +6,28 @@
         <h4 class="card-title">Yeni Dolly Ekle</h4>
     </div>
     <div class="card-body mt-2">
+        <!-- AntiForgeryToken Eklendi -->
         <form class="form form-vertical" asp-controller="Dolly" asp-action="AddDolly" method="post">
+            @Html.AntiForgeryToken()
+
+            <!-- Controller validation hatası verirse ekranda göstermek için -->
+            <div asp-validation-summary="All" class="text-danger mb-1"></div>
+
             <div class="row">
                 <div class="col-12 col-md-6 mb-1">
-                    <label class="form-label" for="SerialNumber">Seri Numarası</label>
+                    <label class="form-label" asp-for="SerialNumber">Seri Numarası</label>
                     <input type="text" asp-for="SerialNumber" class="form-control" placeholder="Örn: 2024001" required />
                 </div>
 
                 <div class="col-12 col-md-6 mb-1">
-                    <label class="form-label" for="Name">Dolly İsmi</label>
+                    <label class="form-label" asp-for="Name">Dolly İsmi</label>
                     <input type="text" asp-for="Name" class="form-control" placeholder="Örn: TDC-V3" required />
                 </div>
 
                 <div class="col-12 mb-2">
                     <div class="form-check form-switch form-check-primary">
                         <input type="checkbox" asp-for="IsActive" class="form-check-input" checked />
-                        <label class="form-check-label" for="IsActive">Aktif Olarak Başlat</label>
+                        <label class="form-check-label" asp-for="IsActive">Aktif Olarak Başlat</label>
                     </div>
                 </div>
 
@@ -37,7 +43,7 @@
 @section Scripts {
     <script>
         $(window).on('load', function() {
-            if (feather) { feather.replace(); }
+            if (typeof feather !== 'undefined') { feather.replace(); }
         });
     </script>
 }

@@ -17,6 +17,7 @@ namespace THYLoggerAPI_POSTGRESQL.Controllers
 
         // GET: api/Sicaklik
         [HttpGet]
+        [HttpGet("GetAll")]
         public async Task<IActionResult> GetAll()
         {
             try

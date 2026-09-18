@@ -15,8 +15,7 @@ namespace THYLoggerAPI_POSTGRESQL.Controllers
             _dollyService = dollyService;
         }
 
-        // GET: api/Dolly
-        [HttpGet]
+        [HttpGet("GetAll")]
         public async Task<IActionResult> GetAll()
         {
             try
@@ -30,8 +29,7 @@ namespace THYLoggerAPI_POSTGRESQL.Controllers
             }
         }
 
-        // GET: api/Dolly/5
-        [HttpGet("{id}")]
+        [HttpGet("GetById/{id:int}")]
         public async Task<IActionResult> GetById(int id)
         {
             try
@@ -50,8 +48,7 @@ namespace THYLoggerAPI_POSTGRESQL.Controllers
             }
         }
 
-        // POST: api/Dolly
-        [HttpPost]
+        [HttpPost("Add")]
         public async Task<IActionResult> Add([FromBody] Dolly entity)
         {
             if (entity == null)
@@ -69,9 +66,7 @@ namespace THYLoggerAPI_POSTGRESQL.Controllers
                 return BadRequest("Ekleme sırasında bir hata oluştu: " + ex.Message);
             }
         }
-
-        // PUT: api/Dolly/5
-        [HttpPut("{id}")]
+        [HttpPut("Update/{id:int}")]
         public async Task<IActionResult> Update(int id, [FromBody] Dolly entity)
         {
             if (entity == null || id != entity.Id)

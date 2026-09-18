@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using THYLoggerAPI_POSTGRESQL.Context;
 using THYLoggerAPI_POSTGRESQL.Model;
 
@@ -33,7 +34,7 @@ namespace THYLoggerAPI_POSTGRESQL.Services
 
             return dolly;
         }
-
+        [HttpPost("Add")]
         public async Task<Dolly> AddAsync(Dolly entity)
         {
             try

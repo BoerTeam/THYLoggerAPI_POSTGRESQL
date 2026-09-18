@@ -15,8 +15,7 @@ namespace THYLoggerAPI_POSTGRESQL.Controllers
             _gpsService = gpsService;
         }
 
-        // GET: api/Gps
-        [HttpGet]
+        [HttpGet("GetAll")]
         public async Task<IActionResult> GetAll()
         {
             try
@@ -30,9 +29,7 @@ namespace THYLoggerAPI_POSTGRESQL.Controllers
             }
         }
 
-        // POST: api/Gps  VEYA  POST: api/Gps/Add
-        // Cihaz "api/Gps/Add" adresine istek attığı için [HttpPost("Add")] eklendi
-        [HttpPost]
+        
         [HttpPost("Add")]
         public async Task<IActionResult> Add([FromBody] Gpsdatum entity)
         {
@@ -58,7 +55,6 @@ namespace THYLoggerAPI_POSTGRESQL.Controllers
             }
         }
 
-        // GET: api/Gps/History/5?start=2026-09-01T00:00:00&end=2026-09-09T00:00:00
         [HttpGet("History/{id}")]
         public async Task<IActionResult> GetHistoryData(int id, [FromQuery] DateTime? start, [FromQuery] DateTime? end)
         {
