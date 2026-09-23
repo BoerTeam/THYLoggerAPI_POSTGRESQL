@@ -69,16 +69,19 @@
                         </div>
                         <div class="col-md-8">
                             <!-- Excel Rapor Filtre Formu (Modal İçi) -->
+                            <!-- Excel Rapor Filtre Formu (Modal İçi) -->
                             <form action="/Home/ExportToExcel" method="get" class="row gx-2 align-items-center justify-content-end">
                                 <input type="hidden" name="dollyId" id="modalDollyIdInput" value="" />
 
                                 <div class="col-auto">
-                                    <label class="form-label mb-0 small fw-bold">Başlangıç:</label>
-                                    <input type="date" name="startDate" class="form-control form-control-sm" value="@DateTime.Now.AddDays(-7).ToString("yyyy-MM-dd")" required />
+                                    <label class="form-label mb-0 small fw-bold">Başlangıç Tarihi & Saati:</label>
+                                    <input type="datetime-local" name="startDate" class="form-control form-control-sm"
+                                           value="@DateTime.Now.AddDays(-7).ToString("yyyy-MM-ddTHH:mm")" required />
                                 </div>
                                 <div class="col-auto">
-                                    <label class="form-label mb-0 small fw-bold">Bitiş:</label>
-                                    <input type="date" name="endDate" class="form-control form-control-sm" value="@DateTime.Now.ToString("yyyy-MM-dd")" required />
+                                    <label class="form-label mb-0 small fw-bold">Bitiş Tarihi & Saati:</label>
+                                    <input type="datetime-local" name="endDate" class="form-control form-control-sm"
+                                           value="@DateTime.Now.ToString("yyyy-MM-ddTHH:mm")" required />
                                 </div>
                                 <div class="col-auto">
                                     <label class="form-label d-block mb-0 small">&nbsp;</label>

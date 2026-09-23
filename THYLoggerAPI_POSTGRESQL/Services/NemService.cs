@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using THYLoggerAPI_POSTGRESQL.Context;
 using THYLoggerAPI_POSTGRESQL.Model;
 
@@ -8,11 +9,16 @@ namespace THYLoggerAPI_POSTGRESQL.Services
     {
         private readonly ApplicationDbContext _context;
         private readonly ILogger<NemService> _logger;
+        private readonly NemCalibrationOptions _calibrationOptions;
 
-        public NemService(ApplicationDbContext context, ILogger<NemService> logger)
+        public NemService(
+            ApplicationDbContext context,
+            ILogger<NemService> logger,
+            IOptions<NemCalibrationOptions> calibrationOptions)
         {
             _context = context;
             _logger = logger;
+            _calibrationOptions = calibrationOptions.Value; // appsettings.json verileri
         }
 
         public async Task<List<Nem>> GetAllAsync()
@@ -47,20 +53,21 @@ namespace THYLoggerAPI_POSTGRESQL.Services
             // 3. İlişkileri ata
             entity.DollyId = dolly.Id;
 
-            // 4. Kalibre Edilmiş Nem Hesaplaması (4-20mA -> 0-100% RH Lineer Dönüşüm)
+            // 4. Kalibre Edilmiş Nem Hesaplaması (Dışarıdan appsettings.json Üzerinden)
             if (entity.Nem1.HasValue)
             {
                 double rawValue = (double)entity.Nem1.Value; // Cihazdan gelen mA değeri (Örn: 12.35)
 
-                double inLow = 4.0;
-                double inHigh = 20.0;
-                double outLow = 0.0;   // %0 RH
-                double outHigh = 100.0; // %100 RH
+                // appsettings.json -> SensorCalibration:Nem alanından gelen değerler
+                double inLow = _calibrationOptions.InLow;
+                double inHigh = _calibrationOptions.InHigh;
+                double outLow = _calibrationOptions.OutLow;
+                double outHigh = _calibrationOptions.OutHigh;
 
                 // Lineer interpolasyon formülü
                 double hesaplananNem = ((rawValue - inLow) * (outHigh - outLow) / (inHigh - inLow)) + outLow;
 
-                entity.Nem1 = (float)Math.Round(hesaplananNem, 4);
+                entity.Nem1 = (float)Math.Round(hesaplananNem, _calibrationOptions.Precision);
             }
 
             // 5. Zaman damgası ve Id sıfırlama

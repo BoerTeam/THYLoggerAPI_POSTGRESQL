@@ -54,8 +54,9 @@ namespace Dashboard.Controllers
         [Authorize]
         public async Task<IActionResult> ExportToExcel(int? dollyId, DateTime startDate, DateTime endDate)
         {
+            // Arayüzden saatle birlikte geldiði için doðrudan UTC Kind atamasý yapýyoruz (AddDays YAPILMIYOR)
             var startUtc = DateTime.SpecifyKind(startDate, DateTimeKind.Utc);
-            var endUtc = DateTime.SpecifyKind(endDate, DateTimeKind.Utc).AddDays(1).AddTicks(-1);
+            var endUtc = DateTime.SpecifyKind(endDate, DateTimeKind.Utc);
 
             var tumSicakliklar = await _apiService.GetAsync<List<Sicaklik>>("api/Sicaklik") ?? new List<Sicaklik>();
             var tumNemler = await _apiService.GetAsync<List<Nem>>("api/Nem/Get") ?? new List<Nem>();
@@ -81,6 +82,7 @@ namespace Dashboard.Controllers
 
             using (var workbook = new XLWorkbook())
             {
+                // 1. Sýcaklýk Sayfasý
                 var wsTemp = workbook.Worksheets.Add("Sýcaklýk Verileri");
                 wsTemp.Cell(1, 1).Value = "Dolly Adý";
                 wsTemp.Cell(1, 2).Value = "Tarih / Saat";
@@ -96,6 +98,7 @@ namespace Dashboard.Controllers
                 }
                 wsTemp.Columns().AdjustToContents();
 
+                // 2. Nem Sayfasý
                 var wsHum = workbook.Worksheets.Add("Nem Verileri");
                 wsHum.Cell(1, 1).Value = "Dolly Adý";
                 wsHum.Cell(1, 2).Value = "Tarih / Saat";
@@ -111,6 +114,7 @@ namespace Dashboard.Controllers
                 }
                 wsHum.Columns().AdjustToContents();
 
+                // 3. GPS Konum Sayfasý
                 var wsGps = workbook.Worksheets.Add("GPS Konum Verileri");
                 wsGps.Cell(1, 1).Value = "Dolly Adý";
                 wsGps.Cell(1, 2).Value = "Tarih / Saat";
@@ -132,7 +136,10 @@ namespace Dashboard.Controllers
                 {
                     workbook.SaveAs(stream);
                     var content = stream.ToArray();
-                    string fileName = $"Dolly_Rapor_{startDate:yyyyMMdd}_{endDate:yyyyMMdd}.xlsx";
+
+                    // Dosya adý artýk saat detayýný da içeriyor (Örn: Dolly_Rapor_20260923_0900_20260923_1730.xlsx)
+                    string fileName = $"Dolly_Rapor_{startDate:yyyyMMdd_HHmm}_{endDate:yyyyMMdd_HHmm}.xlsx";
+
                     return File(content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
                 }
             }
@@ -190,6 +197,7 @@ namespace Dashboard.Controllers
             return View();
         }
 
+
         [HttpPost]
         [AllowAnonymous]
         public async Task<IActionResult> Login(LoginViewModel model)
@@ -245,6 +253,39 @@ namespace Dashboard.Controllers
             return View(model);
         }
 
+        //[HttpGet]
+        //[AllowAnonymous]
+        //public IActionResult Login()
+        //{
+        //    if (User.Identity?.IsAuthenticated == true)
+        //    {
+        //        return RedirectToAction("Index", "Home");
+        //    }
+
+        //    // CSRF ve Replay korumasý için URL-Safe Base64 üretimi (Doküman Madde 3)
+        //    byte[] stateBytes = RandomNumberGenerator.GetBytes(32);
+        //    byte[] nonceBytes = RandomNumberGenerator.GetBytes(16);
+
+        //    string state = Convert.ToBase64String(stateBytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+        //    string nonce = Convert.ToBase64String(nonceBytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+
+        //    var clientId = _config["OidcSettings:ClientId"] ?? "";
+        //    var redirectUri = _config["OidcSettings:RedirectUri"] ?? "";
+        //    var authorizeUrl = _config["OidcSettings:AuthorizeUrl"] ?? "";
+
+        //    // scope appsettings.json dosyasýndan okunuyor (varsayýlan: openid profile email)
+        //    var scope = _config["OidcSettings:Scope"] ?? "openid profile email";
+
+        //    // URL Parametrelerinin güvenli þekilde oluþturulmasý
+        //    string authRedirectUrl = $"{authorizeUrl}?response_type=code" +
+        //                             $"&client_id={Uri.EscapeDataString(clientId)}" +
+        //                             $"&scope={Uri.EscapeDataString(scope)}" +
+        //                             $"&redirect_uri={Uri.EscapeDataString(redirectUri)}" +
+        //                             $"&state={Uri.EscapeDataString(state)}" +
+        //                             $"&nonce={Uri.EscapeDataString(nonce)}";
+
+        //    return Redirect(authRedirectUrl);
+        //}
 
         // 2. THY Portalýndan Doðrulama Sonrasý Dönülen Callback Adresi
         [HttpGet]

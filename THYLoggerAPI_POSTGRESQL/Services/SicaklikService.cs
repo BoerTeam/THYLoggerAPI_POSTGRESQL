@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using THYLoggerAPI_POSTGRESQL.Context;
 using THYLoggerAPI_POSTGRESQL.Model;
 
@@ -8,11 +9,16 @@ namespace THYLoggerAPI_POSTGRESQL.Services
     {
         private readonly ApplicationDbContext _context;
         private readonly ILogger<SicaklikService> _logger;
+        private readonly SicaklikCalibrationOptions _calibrationOptions;
 
-        public SicaklikService(ApplicationDbContext context, ILogger<SicaklikService> logger)
+        public SicaklikService(
+            ApplicationDbContext context,
+            ILogger<SicaklikService> logger,
+            IOptions<SicaklikCalibrationOptions> calibrationOptions)
         {
             _context = context;
             _logger = logger;
+            _calibrationOptions = calibrationOptions.Value; // appsettings.json verileri
         }
 
         public async Task<List<Sicaklik>> GetAllAsync()
@@ -50,20 +56,21 @@ namespace THYLoggerAPI_POSTGRESQL.Services
                 entity.DollyId = dolly.Id;
                 entity.Id = 0; // EF Core otomatik ID üretimi için resetleme
 
-                // 4. Kalibre Edilmiş Sıcaklık Hesaplaması (4-20mA -> 0-100°C Lineer Dönüşüm)
+                // 4. Kalibre Edilmiş Sıcaklık Hesaplaması (Dışarıdan appsettings.json Üzerinden)
                 if (entity.Sicaklik1.HasValue)
                 {
                     double rawValue = (double)entity.Sicaklik1.Value; // Cihazdan gelen mA değeri (Örn: 9.92)
 
-                    double inLow = 4.0;
-                    double inHigh = 20.0;
-                    double outLow = 0.0;   // 0°C
-                    double outHigh = 100.0; // 100°C
+                    // appsettings.json -> SensorCalibration:Sicaklik alanından gelen değerler
+                    double inLow = _calibrationOptions.InLow;
+                    double inHigh = _calibrationOptions.InHigh;
+                    double outLow = _calibrationOptions.OutLow;
+                    double outHigh = _calibrationOptions.OutHigh;
 
                     // Lineer interpolasyon formülü
                     double hesaplanan = ((rawValue - inLow) * (outHigh - outLow) / (inHigh - inLow)) + outLow;
 
-                    entity.Sicaklik1 = (float)Math.Round(hesaplanan, 2);
+                    entity.Sicaklik1 = (float)Math.Round(hesaplanan, _calibrationOptions.Precision);
                 }
 
                 // 5. Zaman damgası ve Kayıt

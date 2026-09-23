@@ -18,9 +18,13 @@ builder.Host.UseSerilog((context, services, configuration) => configuration
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
-
 builder.Services.AddScoped<AuditInterceptor>();
 
+// Sensör Kalibrasyon Ayarlarýnýn appsettings.json Ýle Eþlenmesi
+builder.Services.Configure<NemCalibrationOptions>(
+    builder.Configuration.GetSection("SensorCalibration:Nem"));
+builder.Services.Configure<SicaklikCalibrationOptions>(
+    builder.Configuration.GetSection("SensorCalibration:Sicaklik"));
 // Yetkilendirme ve Kimlik Doðrulama Servis Kayýtlarý
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<UserService>();
@@ -99,7 +103,7 @@ using (var scope = app.Services.CreateScope())
             {
                 UserName = "admin",
                 Email = "admin@boer.com.tr",
-                PasswordHash = "SYSTEM_INITIAL_SEED_HASH" // PasswordHash IsRequired olduðu için dolduruldu
+                PasswordHash = "SYSTEM_INITIAL_SEED_HASH"
             };
 
             context.Users.Add(adminUser);
