@@ -16,7 +16,10 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.ExpireTimeSpan = TimeSpan.FromHours(8);
         options.SlidingExpiration = true;
     });
-
+// Program.cs içerisine ekleyin (app.Build() öncesine veya sonrasýna)
+var cultureInfo = new System.Globalization.CultureInfo("tr-TR");
+System.Globalization.CultureInfo.DefaultThreadCurrentCulture = cultureInfo;
+System.Globalization.CultureInfo.DefaultThreadCurrentUICulture = cultureInfo;
 // 2.1 Role ve Permission Tabanlý Policy Tanýmlarý (Tüm Controller'lar Ýçin)
 builder.Services.AddAuthorization(options =>
 {

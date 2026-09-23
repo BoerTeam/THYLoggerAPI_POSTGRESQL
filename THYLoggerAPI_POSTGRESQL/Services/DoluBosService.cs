@@ -48,7 +48,9 @@ namespace THYLoggerAPI_POSTGRESQL.Services
             entity.DollyId = dolly.Id;
 
             // 4. Zaman damgası
-            entity.Time = DateTime.UtcNow;
+            // Windows ve Linux (IIS/Docker) uyumlu Türkiye saati alımı:
+            var turkeyTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Turkey Standard Time");
+            entity.Time = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, turkeyTimeZone);
 
             try
             {

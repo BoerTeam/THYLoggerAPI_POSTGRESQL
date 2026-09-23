@@ -15,6 +15,7 @@
             // GPS verisini kendi tablosundan (Gpsdatum) çekiyoruz
             var sonGps = Model.gpsdatum.Where(x => x.DollyId == dolly.Id).OrderByDescending(x => x.Time).FirstOrDefault();
             double sicaklikDegeri = sonSicaklik?.Sicaklik1 ?? 0;
+
             // C# Tarafında Koordinat Formatlama (Nokta sorunu çözümü)
             string latVal = sonGps?.Latitude?.ToString(CultureInfo.InvariantCulture) ?? "";
             string lngVal = sonGps?.Longitude?.ToString(CultureInfo.InvariantCulture) ?? "";
@@ -68,8 +69,7 @@
                             </div>
                         </div>
                         <div class="col-md-8">
-                            <!-- Excel Rapor Filtre Formu (Modal İçi) -->
-                            <!-- Excel Rapor Filtre Formu (Modal İçi) -->
+                            <!-- Excel Rapor Filtre Formu (Tarih ve Saat Seçimli) -->
                             <form action="/Home/ExportToExcel" method="get" class="row gx-2 align-items-center justify-content-end">
                                 <input type="hidden" name="dollyId" id="modalDollyIdInput" value="" />
 
@@ -196,21 +196,23 @@
                 const fTemps = allTemps.filter(x => (x.DollyId || x.dollyId) === id).slice(-15);
                 const fHums = allHumidities.filter(x => (x.DollyId || x.dollyId) === id).slice(-15);
 
+                // Sıcaklık Etiketleri (getHours/getMinutes kullanımıyla yerel saat düzeltildi)
                 tempChart.data.labels = fTemps.map(x => {
                     const d = new Date(x.Time || x.time);
                     if (isNaN(d)) return "";
-                    const hours = d.getUTCHours().toString().padStart(2, '0');
-                    const minutes = d.getUTCMinutes().toString().padStart(2, '0');
+                    const hours = d.getHours().toString().padStart(2, '0');
+                    const minutes = d.getMinutes().toString().padStart(2, '0');
                     return `${hours}:${minutes}`;
                 });
                 tempChart.data.datasets[0].data = fTemps.map(x => x.Sicaklik1 ?? x.sicaklik1);
                 tempChart.update();
 
+                // Nem Etiketleri (getHours/getMinutes kullanımıyla yerel saat düzeltildi)
                 humChart.data.labels = fHums.map(x => {
                     const d = new Date(x.Time || x.time);
                     if (isNaN(d)) return "";
-                    const hours = d.getUTCHours().toString().padStart(2, '0');
-                    const minutes = d.getUTCMinutes().toString().padStart(2, '0');
+                    const hours = d.getHours().toString().padStart(2, '0');
+                    const minutes = d.getMinutes().toString().padStart(2, '0');
                     return `${hours}:${minutes}`;
                 });
                 humChart.data.datasets[0].data = fHums.map(x => x.Nem1 ?? x.nem1);

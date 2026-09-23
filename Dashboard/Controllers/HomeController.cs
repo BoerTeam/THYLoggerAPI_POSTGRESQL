@@ -54,7 +54,6 @@ namespace Dashboard.Controllers
         [Authorize]
         public async Task<IActionResult> ExportToExcel(int? dollyId, DateTime startDate, DateTime endDate)
         {
-            // Arayüzden saatle birlikte geldiði için doðrudan UTC Kind atamasý yapýyoruz (AddDays YAPILMIYOR)
             var startUtc = DateTime.SpecifyKind(startDate, DateTimeKind.Utc);
             var endUtc = DateTime.SpecifyKind(endDate, DateTimeKind.Utc);
 
@@ -64,6 +63,7 @@ namespace Dashboard.Controllers
             var tumDollyler = await _apiService.GetAsync<List<Dolly>>("api/Dolly/Get") ?? new List<Dolly>();
 
             var dollyDict = tumDollyler.ToDictionary(x => x.Id, x => x.Name);
+            var trCulture = new System.Globalization.CultureInfo("tr-TR");
 
             var filteredSicaklik = tumSicakliklar
                 .Where(x => (!dollyId.HasValue || x.DollyId == dollyId) && x.Time >= startUtc && x.Time <= endUtc)
@@ -92,7 +92,15 @@ namespace Dashboard.Controllers
                 foreach (var item in filteredSicaklik)
                 {
                     wsTemp.Cell(row, 1).Value = dollyDict.TryGetValue(item.DollyId, out var name) ? name : item.DollyId.ToString();
-                    wsTemp.Cell(row, 2).Value = item.Time?.ToString("dd.MM.yyyy HH:mm:ss");
+
+                    if (item.Time.HasValue)
+                    {
+                        var cell = wsTemp.Cell(row, 2);
+                        // String metin formatýnda 24 saatlik yazdýrma
+                        cell.Value = item.Time.Value.ToString("dd.MM.yyyy HH:mm:ss", trCulture);
+                        cell.Style.NumberFormat.Format = "@"; // Metin (Text) formatýna zorlama
+                    }
+
                     wsTemp.Cell(row, 3).Value = item.Sicaklik1;
                     row++;
                 }
@@ -108,7 +116,14 @@ namespace Dashboard.Controllers
                 foreach (var item in filteredNem)
                 {
                     wsHum.Cell(row, 1).Value = dollyDict.TryGetValue(item.DollyId, out var name) ? name : item.DollyId.ToString();
-                    wsHum.Cell(row, 2).Value = item.Time?.ToString("dd.MM.yyyy HH:mm:ss");
+
+                    if (item.Time.HasValue)
+                    {
+                        var cell = wsHum.Cell(row, 2);
+                        cell.Value = item.Time.Value.ToString("dd.MM.yyyy HH:mm:ss", trCulture);
+                        cell.Style.NumberFormat.Format = "@";
+                    }
+
                     wsHum.Cell(row, 3).Value = item.Nem1;
                     row++;
                 }
@@ -125,7 +140,14 @@ namespace Dashboard.Controllers
                 foreach (var item in filteredGps)
                 {
                     wsGps.Cell(row, 1).Value = dollyDict.TryGetValue(item.DollyId, out var name) ? name : item.DollyId.ToString();
-                    wsGps.Cell(row, 2).Value = item.Time?.ToString("dd.MM.yyyy HH:mm:ss");
+
+                    if (item.Time.HasValue)
+                    {
+                        var cell = wsGps.Cell(row, 2);
+                        cell.Value = item.Time.Value.ToString("dd.MM.yyyy HH:mm:ss", trCulture);
+                        cell.Style.NumberFormat.Format = "@";
+                    }
+
                     wsGps.Cell(row, 3).Value = item.Latitude;
                     wsGps.Cell(row, 4).Value = item.Longitude;
                     row++;
@@ -137,14 +159,12 @@ namespace Dashboard.Controllers
                     workbook.SaveAs(stream);
                     var content = stream.ToArray();
 
-                    // Dosya adý artýk saat detayýný da içeriyor (Örn: Dolly_Rapor_20260923_0900_20260923_1730.xlsx)
-                    string fileName = $"Dolly_Rapor_{startDate:yyyyMMdd_HHmm}_{endDate:yyyyMMdd_HHmm}.xlsx";
+                    string fileName = $"Dolly_Rapor_{startDate.ToString("yyyyMMdd_HHmm", trCulture)}_{endDate.ToString("yyyyMMdd_HHmm", trCulture)}.xlsx";
 
                     return File(content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
                 }
             }
         }
-
         [HttpGet]
         [Authorize(Policy = "DollyView")]
         public async Task<JsonResult> GetLatestData(int id)

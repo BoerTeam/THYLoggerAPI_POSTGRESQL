@@ -46,7 +46,9 @@ namespace THYLoggerAPI_POSTGRESQL.Services
 
             // 3. Cihaz ID'si ve veritabanı kayıt zamanı ataması
             entity.DollyId = dolly.Id;
-            entity.Time = DateTime.UtcNow; // Cihazdan gelen 1970 varsayılan zaman yerine sunucu zamanı basılır
+            // Windows ve Linux (IIS/Docker) uyumlu Türkiye saati alımı:
+            var turkeyTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Turkey Standard Time");
+            entity.Time = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, turkeyTimeZone);
 
             try
             {

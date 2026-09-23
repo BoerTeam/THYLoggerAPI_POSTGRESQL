@@ -71,7 +71,9 @@ namespace THYLoggerAPI_POSTGRESQL.Services
             }
 
             // 5. Zaman damgası ve Id sıfırlama
-            entity.Time = DateTime.UtcNow;
+            // Windows ve Linux (IIS/Docker) uyumlu Türkiye saati alımı:
+            var turkeyTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Turkey Standard Time");
+            entity.Time = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, turkeyTimeZone);
             entity.Id = 0;
 
             try
