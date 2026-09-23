@@ -45,6 +45,42 @@ namespace Dashboard.Controllers
 
             return RedirectToAction("Index");
         }
+        [HttpPost]
+        public async Task<IActionResult> UpdateRole(UpdateRoleViewModel model)
+        {
+            if (!ModelState.IsValid) return RedirectToAction("Index");
+
+            var isSuccess = await _apiService.PutAsync("api/Roles/Update", model);
+
+            if (isSuccess)
+                TempData["SuccessMessage"] = "Rol başarıyla güncellendi.";
+            else
+                TempData["ErrorMessage"] = "Rol güncellenirken bir hata oluştu.";
+
+            return RedirectToAction("Index");
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> DeleteRole(int id)
+        {
+            var isSuccess = await _apiService.DeleteAsync($"api/Roles/Delete/{id}");
+
+            if (isSuccess)
+                TempData["SuccessMessage"] = "Rol başarıyla silindi.";
+            else
+                TempData["ErrorMessage"] = "Rol silinirken bir hata oluştu veya sistem rolü silinemez.";
+
+            return RedirectToAction("Index");
+        }
+
+        // DTO
+        public class UpdateRoleViewModel
+        {
+            public int Id { get; set; }
+            public string Name { get; set; } = string.Empty;
+            public string? Description { get; set; }
+            public List<int> PermissionIds { get; set; } = new();
+        }
     }
 
     public class RoleItemDto

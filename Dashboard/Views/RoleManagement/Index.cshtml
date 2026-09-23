@@ -32,8 +32,8 @@
                                     @foreach (var perm in permissions)
                                     {
                                         <div class="form-check mb-50">
-                                            <input class="form-check-input" type="checkbox" name="PermissionIds" value="@perm.Id" id="perm-@perm.Id">
-                                            <label class="form-check-label" for="perm-@perm.Id">
+                                            <input class="form-check-input" type="checkbox" name="PermissionIds" value="@perm.Id" id="perm-create-@perm.Id">
+                                            <label class="form-check-label" for="perm-create-@perm.Id">
                                                 @perm.Name <small class="text-muted">(@perm.Code)</small>
                                             </label>
                                         </div>
@@ -52,7 +52,7 @@
             </div>
         </div>
 
-        <!-- Mevcut Rol Listesi ve Bağlı İzinler -->
+        <!-- Mevcut Rol Listesi ve İşlemler -->
         <div class="col-md-7">
             <div class="card">
                 <div class="card-header">
@@ -66,6 +66,7 @@
                                     <th>Rol Adı</th>
                                     <th>Açıklama</th>
                                     <th>Tanımlı İzinler</th>
+                                    <th class="text-center" style="width: 120px;">İşlemler</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -73,6 +74,9 @@
                                 {
                                     @foreach (var role in roles)
                                     {
+                                        var rolePermIds = role.RolePermissions?.Select(rp => rp.PermissionId).ToList() ?? new List<int>();
+                                        var rolePermIdsJson = System.Text.Json.JsonSerializer.Serialize(rolePermIds);
+
                                         <tr>
                                             <td>
                                                 <span class="badge bg-light-primary fw-bolder fs-6">@role.Name</span>
@@ -91,13 +95,28 @@
                                                     <span class="text-muted small">İzin atanmamış</span>
                                                 }
                                             </td>
+                                            <td class="text-center">
+                                                <div class="btn-group" role="group">
+                                                    <!-- Düzenle Butonu -->
+                                                    <button type="button" class="btn btn-sm btn-outline-warning"
+                                                            onclick="editRole(@role.Id, '@role.Name', '@role.Description', @rolePermIdsJson)">
+                                                        Düzenle
+                                                    </button>
+
+                                                    <!-- Silme Formu -->
+                                                    <form asp-controller="RoleManagement" asp-action="DeleteRole" method="post" onsubmit="return confirm('@role.Name rolünü silmek istediğinize emin misiniz?');" style="display:inline;">
+                                                        <input type="hidden" name="id" value="@role.Id" />
+                                                        <button type="submit" class="btn btn-sm btn-outline-danger">Sil</button>
+                                                    </form>
+                                                </div>
+                                            </td>
                                         </tr>
                                     }
                                 }
                                 else
                                 {
                                     <tr>
-                                        <td colspan="3" class="text-center text-muted">Mevcut rol bulunamadı.</td>
+                                        <td colspan="4" class="text-center text-muted">Mevcut rol bulunamadı.</td>
                                     </tr>
                                 }
                             </tbody>
@@ -108,3 +127,69 @@
         </div>
     </div>
 </div>
+
+<!-- ROL DÜZENLEME MODAL -->
+<div class="modal fade" id="editRoleModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Rolü Düzenle</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form asp-controller="RoleManagement" asp-action="UpdateRole" method="post">
+                <div class="modal-body">
+                    <input type="hidden" id="edit-role-id" name="Id" />
+                    <div class="mb-1">
+                        <label class="form-label">Rol Adı</label>
+                        <input type="text" id="edit-role-name" name="Name" class="form-control" required />
+                    </div>
+                    <div class="mb-1">
+                        <label class="form-label">Açıklama</label>
+                        <input type="text" id="edit-role-desc" name="Description" class="form-control" />
+                    </div>
+                    <div class="mb-1">
+                        <label class="form-label fw-bolder">Atanacak İzinler</label>
+                        <div class="border p-1 rounded" style="max-height: 200px; overflow-y: auto;">
+                            @foreach (var perm in permissions)
+                            {
+                                <div class="form-check mb-50">
+                                    <input class="form-check-input edit-perm-checkbox" type="checkbox" name="PermissionIds" value="@perm.Id" id="perm-edit-@perm.Id">
+                                    <label class="form-check-label" for="perm-edit-@perm.Id">
+                                        @perm.Name <small class="text-muted">(@perm.Code)</small>
+                                    </label>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
+                    <button type="submit" class="btn btn-primary">Değişiklikleri Kaydet</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    function editRole(id, name, description, permissionIds) {
+        document.getElementById('edit-role-id').value = id;
+        document.getElementById('edit-role-name').value = name;
+        document.getElementById('edit-role-desc').value = description || '';
+
+        // Tüm checkbox'ları sıfırla
+        document.querySelectorAll('.edit-perm-checkbox').forEach(cb => cb.checked = false);
+
+        // Rolün izinlerine göre ilgili checkbox'ları işaretle
+        if (permissionIds && permissionIds.length > 0) {
+            permissionIds.forEach(pId => {
+                const cb = document.getElementById('perm-edit-' + pId);
+                if (cb) cb.checked = true;
+            });
+        }
+
+        // Modalı göster
+        var editModal = new bootstrap.Modal(document.getElementById('editRoleModal'));
+        editModal.show();
+    }
+</script>

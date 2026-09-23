@@ -181,6 +181,54 @@ namespace THYLoggerAPI_POSTGRESQL.Context
                     .HasForeignKey(x => x.PermissionId)
                     .OnDelete(DeleteBehavior.Cascade);
             });
+
+
+            // ==========================================
+            // SEED DATA (BAŞLANGIÇ VERİLERİ)
+            // ==========================================
+
+            // 1. Temel Roller
+            modelBuilder.Entity<Role>().HasData(
+                new Role { Id = 1, Name = "Admin", IsActive = true },
+                new Role { Id = 2, Name = "User", IsActive = true },
+                new Role { Id = 3, Name = "SahaOperatoru", IsActive = true }
+            );
+
+            // 2. Temel İzinler (Dashboard & Dolly Yetkileri)
+            modelBuilder.Entity<Permission>().HasData(
+                new Permission { Id = 1, Name = "Dolly Görüntüleme", Code = "DollyView" },
+                new Permission { Id = 2, Name = "Dolly Düzenleme", Code = "DollyEdit" },
+                new Permission { Id = 3, Name = "Excel Çıktısı Alma", Code = "ExportExcel" },
+                new Permission { Id = 4, Name = "Kullanıcı Yönetimi", Code = "UserManagement" }
+            );
+
+            // 3. Admin Rolüne Tüm İzinlerin Atanması
+            modelBuilder.Entity<RolePermission>().HasData(
+                new RolePermission { RoleId = 1, PermissionId = 1 },
+                new RolePermission { RoleId = 1, PermissionId = 2 },
+                new RolePermission { RoleId = 1, PermissionId = 3 },
+                new RolePermission { RoleId = 1, PermissionId = 4 },
+                // User Rolüne Varsayılan Görüntüleme İzni
+                new RolePermission { RoleId = 2, PermissionId = 1 }
+            );
+
+            // 4. Varsayılan Sistem Admin Kullanıcısı
+            modelBuilder.Entity<User>().HasData(
+                new User
+                {
+                    Id = 1,
+                    UserName = "admin",
+                    Email = "admin@boer.com.tr",
+                    PasswordHash = "SYSTEM_DEFAULT_HASH", // Modelinizde IsRequired olduğu için dolduruldu
+                    IsActive = true,
+                    CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+                }
+            );
+
+            // 5. Admin Kullanıcısına Admin Rolünün Atanması
+            modelBuilder.Entity<UserRole>().HasData(
+                new UserRole { UserId = 1, RoleId = 1 }
+            );
         }
     }
 }

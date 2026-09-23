@@ -7,7 +7,9 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Diagnostics;
+using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Security.Cryptography;
 
 namespace Dashboard.Controllers
 {
@@ -16,11 +18,13 @@ namespace Dashboard.Controllers
     {
         private readonly IApiService _apiService;
         private readonly ILogger<HomeController> _logger;
+        private readonly IConfiguration _config;
 
-        public HomeController(IApiService apiService, ILogger<HomeController> logger)
+        public HomeController(IApiService apiService, ILogger<HomeController> logger, IConfiguration config)
         {
             _apiService = apiService;
             _logger = logger;
+            _config = config;
         }
 
         [Authorize(Policy = "DollyView")]
@@ -47,7 +51,7 @@ namespace Dashboard.Controllers
         }
 
         [HttpGet]
-        [Authorize(Policy = "ExportExcel")]
+        [Authorize]
         public async Task<IActionResult> ExportToExcel(int? dollyId, DateTime startDate, DateTime endDate)
         {
             var startUtc = DateTime.SpecifyKind(startDate, DateTimeKind.Utc);
@@ -170,6 +174,11 @@ namespace Dashboard.Controllers
             return Json(data);
         }
 
+        // ==========================================
+        // OIDC / THY SSO ENTEGRASYON ALANI
+        // ==========================================
+
+        // 1. Kullanýcýyý THY SSO Giriþ Ekranýna Yönlendirir
         [HttpGet]
         [AllowAnonymous]
         public IActionResult Login()
@@ -192,10 +201,10 @@ namespace Dashboard.Controllers
             if (response != null && response.IsSuccess)
             {
                 var claims = new List<Claim>
-                {
-                    new Claim(ClaimTypes.NameIdentifier, response.UserId.ToString()),
-                    new Claim(ClaimTypes.Name, response.UserName)
-                };
+         {
+             new Claim(ClaimTypes.NameIdentifier, response.UserId.ToString()),
+             new Claim(ClaimTypes.Name, response.UserName)
+         };
 
                 if (!string.IsNullOrEmpty(response.Token))
                 {
@@ -236,6 +245,86 @@ namespace Dashboard.Controllers
             return View(model);
         }
 
+
+        // 2. THY Portalýndan Doðrulama Sonrasý Dönülen Callback Adresi
+        [HttpGet]
+        [Route("Callback")]
+        [Route("Home/Callback")]
+        [AllowAnonymous]
+        public async Task<IActionResult> Callback(string code, string state)
+        {
+            if (string.IsNullOrEmpty(code))
+            {
+                return RedirectToAction("AccessDenied");
+            }
+
+            // 1. Code -> Token Takasý
+            var tokenRequest = new
+            {
+                grant_type = "authorization_code",
+                code = code,
+                client_id = _config["OidcSettings:ClientId"],
+                redirect_uri = _config["OidcSettings:RedirectUri"]
+            };
+
+            var tokenResponse = await _apiService.PostAsync<OidcTokenResponseDto, object>(
+                _config["OidcSettings:TokenUrl"] ?? "", tokenRequest);
+
+            if (tokenResponse == null || string.IsNullOrEmpty(tokenResponse.IdToken))
+            {
+                return RedirectToAction("AccessDenied");
+            }
+
+            // 2. ID Token Decode Etme
+            var handler = new JwtSecurityTokenHandler();
+            var jwtToken = handler.ReadJwtToken(tokenResponse.IdToken);
+
+            string username = jwtToken.Claims.FirstOrDefault(c =>
+                c.Type == "preferred_username" ||
+                c.Type == "unique_name" ||
+                c.Type == "sub")?.Value ?? "";
+
+            string email = jwtToken.Claims.FirstOrDefault(c => c.Type == "email")?.Value ?? "";
+
+            // 3. API'ye Ýstek At: SsoUserResponseDto Tipinde Kullanýcýyý Çek veya Oluþtur (JIT)
+            var ssoUserDto = new { Username = username, Email = email };
+            var userDetail = await _apiService.PostAsync<SsoUserResponseDto, object>("api/Users/get-or-create-sso-user", ssoUserDto);
+
+            // 4. Claims Hazýrlýðý ve Oturum Açma
+            var claims = new List<Claim>
+    {
+        new Claim(ClaimTypes.NameIdentifier, userDetail?.UserId.ToString() ?? username),
+        new Claim(ClaimTypes.Name, userDetail?.UserName ?? username),
+        new Claim("JWToken", tokenResponse.AccessToken ?? "")
+    };
+
+            // Roller Ekleniyor (String Listesi Olarak)
+            if (userDetail?.Roles != null)
+            {
+                foreach (var roleName in userDetail.Roles)
+                {
+                    claims.Add(new Claim(ClaimTypes.Role, roleName));
+                }
+            }
+
+            // Ýzin Kodlarý (DOLLY_VIEW, DOLLY_EDIT vb.) Ekleniyor
+            if (userDetail?.Permissions != null)
+            {
+                foreach (var perm in userDetail.Permissions)
+                {
+                    claims.Add(new Claim("Permission", perm));
+                }
+            }
+
+            var claimsIdentity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+
+            await HttpContext.SignInAsync(
+                CookieAuthenticationDefaults.AuthenticationScheme,
+                new ClaimsPrincipal(claimsIdentity));
+
+            return RedirectToAction("Index", "Home");
+        }
+
         [HttpPost]
         public async Task<IActionResult> Logout()
         {
@@ -263,5 +352,21 @@ namespace Dashboard.Controllers
         {
             return View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
         }
+    }
+
+    public class OidcTokenResponseDto
+    {
+        public string? AccessToken { get; set; }
+        public string? RefreshToken { get; set; }
+        public string? IdToken { get; set; }
+        public string? TokenType { get; set; }
+        public int ExpiresIn { get; set; }
+    }
+    public class SsoUserResponseDto
+    {
+        public int UserId { get; set; }
+        public string UserName { get; set; } = string.Empty;
+        public List<string> Roles { get; set; } = new();
+        public List<string> Permissions { get; set; } = new();
     }
 }

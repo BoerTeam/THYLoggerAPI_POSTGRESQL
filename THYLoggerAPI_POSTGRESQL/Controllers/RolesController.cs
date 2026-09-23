@@ -67,5 +67,40 @@ namespace THYLoggerAPI_POSTGRESQL.Controllers
                 return StatusCode(500, "Rol oluşturulurken sunucu hatası oluştu: " + ex.Message);
             }
         }
+        // PUT: api/Roles/Update
+        [HttpPut("Update")]
+        public async Task<IActionResult> UpdateRole([FromBody] UpdateRoleDto dto)
+        {
+            try
+            {
+                var result = await _roleService.UpdateRoleAsync(dto);
+                if (!result.IsSuccess)
+                    return BadRequest(result.ErrorMessage);
+
+                return Ok(new { message = "Rol başarıyla güncellendi." });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, "Rol güncellenirken sunucu hatası oluştu: " + ex.Message);
+            }
+        }
+
+        // DELETE: api/Roles/Delete/5
+        [HttpDelete("Delete/{id}")]
+        public async Task<IActionResult> DeleteRole(int id)
+        {
+            try
+            {
+                var result = await _roleService.DeleteRoleAsync(id);
+                if (!result.IsSuccess)
+                    return BadRequest(result.ErrorMessage);
+
+                return Ok(new { message = "Rol başarıyla silindi." });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, "Rol silinirken sunucu hatası oluştu: " + ex.Message);
+            }
+        }
     }
 }

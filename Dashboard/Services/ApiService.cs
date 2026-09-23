@@ -129,5 +129,27 @@ namespace Dashboard.Services
                 return false;
             }
         }
+
+        public async Task<bool> DeleteAsync(string endpoint)
+        {
+            try
+            {
+                AddAuthorizationHeader();
+
+                var response = await _httpClient.DeleteAsync(endpoint);
+                if (response.IsSuccessStatusCode)
+                {
+                    return true;
+                }
+
+                _logger.LogWarning("API DELETE Başarısız: {Endpoint}, Status: {StatusCode}", endpoint, response.StatusCode);
+                return false;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "API DELETE Çağrısında Hata: {Endpoint}", endpoint);
+                return false;
+            }
+        }
     }
 }

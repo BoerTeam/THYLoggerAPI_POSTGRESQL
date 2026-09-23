@@ -9,5 +9,8 @@ namespace Dashboard.Services
         Task<bool> PostAsync<T>(string endpoint, T data);
         Task<TResult?> PostAsync<TResult, TData>(string endpoint, TData data);
         Task<bool> PutAsync<T>(string endpoint, T data);
+
+        // Rol ve diğer silme işlemleri için eklenen metod
+        Task<bool> DeleteAsync(string endpoint);
     }
 }

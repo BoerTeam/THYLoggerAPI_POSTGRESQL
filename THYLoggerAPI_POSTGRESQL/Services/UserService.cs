@@ -97,6 +97,7 @@ namespace THYLoggerAPI_POSTGRESQL.Services
                 throw;
             }
         }
+
         // Kullanıcının mevcut ve tüm rollerini getiren metod (Dashboard ekranı için)
         public async Task<(bool IsSuccess, bool IsNotFound, string? ErrorMessage, UserRoleDetailDto? Data)> GetUserRolesForAssignAsync(int userId)
         {
@@ -148,6 +149,67 @@ namespace THYLoggerAPI_POSTGRESQL.Services
                 _logger.LogError(ex, "Kullanıcı rol detayları çekilirken bir hata oluştu! UserId: {UserId}", userId);
                 throw;
             }
+        }
+
+        // SSO İle Giriş Yapan Kullanıcıyı Bulur veya Otomatik Oluşturur (JIT Provisioning)
+        public async Task<SsoUserResponseDto> GetOrCreateSsoUserAsync(SsoUserDto dto)
+        {
+            _logger.LogInformation("SSO kullanıcısı sorgulanıyor/oluşturuluyor. Username: {Username}", dto.Username);
+
+            var user = await _context.Users
+                .Include(u => u.UserRoles)
+                    .ThenInclude(ur => ur.Role)
+                        .ThenInclude(r => r.RolePermissions)
+                            .ThenInclude(rp => rp.Permission)
+                .FirstOrDefaultAsync(u => u.UserName == dto.Username);
+
+            // Kullanıcı veritabanında yoksa otomatik kaydediyoruz
+            if (user == null)
+            {
+                _logger.LogInformation("SSO kullanıcısı veritabanında bulunamadı, yeni kayıt oluşturuluyor. Username: {Username}", dto.Username);
+
+                user = new User
+                {
+                    UserName = dto.Username,
+                    Email = dto.Email,
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow
+                };
+
+                _context.Users.Add(user);
+                await _context.SaveChangesAsync();
+
+                // Varsayılan rol ataması yapıyoruz (örneğin "User" rolü varsa)
+                var defaultRole = await _context.Roles.FirstOrDefaultAsync(r => r.Name == "User");
+                if (defaultRole != null)
+                {
+                    _context.UserRoles.Add(new UserRole { UserId = user.Id, RoleId = defaultRole.Id });
+                    await _context.SaveChangesAsync();
+
+                    // Yeniden ilişkileri yüklemek için include sorgusunu tazeliyoruz
+                    user = await _context.Users
+                        .Include(u => u.UserRoles)
+                            .ThenInclude(ur => ur.Role)
+                                .ThenInclude(r => r.RolePermissions)
+                                    .ThenInclude(rp => rp.Permission)
+                        .FirstOrDefaultAsync(u => u.Id == user.Id);
+                }
+            }
+
+            var roles = user?.UserRoles?.Select(ur => ur.Role.Name).ToList() ?? new List<string>();
+            var permissions = user?.UserRoles?
+                .SelectMany(ur => ur.Role.RolePermissions)
+                .Select(rp => rp.Permission.Code)
+                .Distinct()
+                .ToList() ?? new List<string>();
+
+            return new SsoUserResponseDto
+            {
+                UserId = user!.Id,
+                UserName = user.UserName,
+                Roles = roles,
+                Permissions = permissions
+            };
         }
     }
 }

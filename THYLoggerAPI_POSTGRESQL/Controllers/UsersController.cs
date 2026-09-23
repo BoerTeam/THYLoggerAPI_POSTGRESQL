@@ -83,5 +83,25 @@ namespace THYLoggerAPI_POSTGRESQL.Controllers
                 return StatusCode(500, "Rol atanırken bir sunucu hatası oluştu: " + ex.Message);
             }
         }
+
+        // POST: api/Users/get-or-create-sso-user
+        [HttpPost("get-or-create-sso-user")]
+        public async Task<IActionResult> GetOrCreateSsoUser([FromBody] SsoUserDto dto)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(dto?.Username))
+                {
+                    return BadRequest("Kullanıcı adı boş olamaz.");
+                }
+
+                var response = await _userService.GetOrCreateSsoUserAsync(dto);
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, "SSO kullanıcısı işlenirken sunucu hatası oluştu: " + ex.Message);
+            }
+        }
     }
 }

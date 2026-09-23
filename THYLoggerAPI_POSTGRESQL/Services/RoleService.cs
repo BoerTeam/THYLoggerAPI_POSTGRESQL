@@ -120,5 +120,80 @@ namespace THYLoggerAPI_POSTGRESQL.Services
                 throw;
             }
         }
+        // Rol Güncelleme Metodu
+        public async Task<(bool IsSuccess, string? ErrorMessage)> UpdateRoleAsync(UpdateRoleDto dto)
+        {
+            if (dto == null || dto.Id <= 0 || string.IsNullOrWhiteSpace(dto.Name))
+            {
+                return (false, "Geçersiz rol verisi.");
+            }
+
+            try
+            {
+                var role = await _context.Roles
+                    .Include(r => r.RolePermissions)
+                    .FirstOrDefaultAsync(r => r.Id == dto.Id);
+
+                if (role == null)
+                {
+                    return (false, "Güncellenecek rol bulunamadı.");
+                }
+
+                // Rol temel bilgilerini güncelle
+                role.Name = dto.Name;
+                role.Description = dto.Description;
+                role.UpdatedAt = DateTime.UtcNow;
+
+                // Eski izinleri temizle
+                _context.RolePermissions.RemoveRange(role.RolePermissions);
+
+                // Yeni seçilen izinleri ekle
+                if (dto.PermissionIds != null && dto.PermissionIds.Any())
+                {
+                    var newPermissions = dto.PermissionIds.Select(pId => new RolePermission
+                    {
+                        RoleId = role.Id,
+                        PermissionId = pId
+                    });
+                    await _context.RolePermissions.AddRangeAsync(newPermissions);
+                }
+
+                await _context.SaveChangesAsync();
+                return (true, null);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Rol güncellenirken hata oluştu! Rol ID: {RoleId}", dto.Id);
+                throw;
+            }
+        }
+
+        // Rol Silme Metodu
+        public async Task<(bool IsSuccess, string? ErrorMessage)> DeleteRoleAsync(int id)
+        {
+            try
+            {
+                var role = await _context.Roles.FindAsync(id);
+                if (role == null)
+                {
+                    return (false, "Silinecek rol bulunamadı.");
+                }
+
+                // Sistem Rolü ise silinmesini engelle (Admin gibi)
+                if (role.IsSystemRole)
+                {
+                    return (false, "Sistem rolleri silinemez.");
+                }
+
+                _context.Roles.Remove(role);
+                await _context.SaveChangesAsync();
+                return (true, null);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Rol silinirken hata oluştu! Rol ID: {RoleId}", id);
+                throw;
+            }
+        }
     }
 }

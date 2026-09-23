@@ -18,6 +18,7 @@ builder.Host.UseSerilog((context, services, configuration) => configuration
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
 builder.Services.AddScoped<AuditInterceptor>();
 
 // Yetkilendirme ve Kimlik Doðrulama Servis Kayýtlarý
@@ -26,6 +27,7 @@ builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<RoleService>();
 builder.Services.AddScoped<PageService>();
 builder.Services.AddScoped<JwtTokenService>();
+
 // IoT ve Cihaz Takip Servis Kayýtlarý
 builder.Services.AddScoped<DollyService>();
 builder.Services.AddScoped<DoluBosService>();
@@ -44,39 +46,87 @@ builder.Services.AddDbContext<ApplicationDbContext>((sp, options) =>
 
 var app = builder.Build();
 
-// Otomatik Database Migration ve Seed Verileri
+// ==========================================
+// AUTOMATIC DATABASE MIGRATION & SEED DATA
+// ==========================================
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
     try
     {
         var context = services.GetRequiredService<ApplicationDbContext>();
+
+        // 1. Tablolar yoksa oluþturur, varsa eksik migrasyonlarý uygular
         context.Database.Migrate();
 
-        // Temel Ýzinlerin (Permissions) Otomatik Eklenmesi
+        // 2. Temel Ýzinlerin (Permissions) Eklemesi
         if (!context.Permissions.Any())
         {
-            context.Permissions.AddRange(
-                new Permission { Name = "Dolly.Read", Description = "Dolly Cihazlarýný Görüntüleme", IsActive = true },
-                new Permission { Name = "Dolly.Write", Description = "Dolly Cihazý Yönetimi", IsActive = true },
-                new Permission { Name = "User.Manage", Description = "Kullanýcý ve Rol Yönetimi", IsActive = true }
-            );
+            var p1 = new Permission { Name = "Dolly Görüntüleme", Code = "DollyView" };
+            var p2 = new Permission { Name = "Dolly Düzenleme", Code = "DollyEdit" };
+            var p3 = new Permission { Name = "Excel Çýktýsý Alma", Code = "ExportExcel" };
+            var p4 = new Permission { Name = "Kullanýcý Yönetimi", Code = "UserManagement" };
+
+            context.Permissions.AddRange(p1, p2, p3, p4);
             context.SaveChanges();
-            Console.WriteLine("--> Temel sistem izinleri (Permissions) veritabanýna eklendi.");
+            Console.WriteLine("--> Temel sistem izinleri (Permissions) eklendi.");
         }
 
-        // Temel Sayfalarýn (Pages) Otomatik Eklenmesi
+        // 3. Temel Rollerin (Roles) Eklenmesi
+        if (!context.Roles.Any())
+        {
+            var adminRole = new Role { Name = "Admin" };
+            var userRole = new Role { Name = "User" };
+
+            context.Roles.AddRange(adminRole, userRole);
+            context.SaveChanges();
+            Console.WriteLine("--> Temel roller (Admin, User) eklendi.");
+
+            // Admin Rolüne Tüm Ýzinlerin Baðlanmasý
+            var allPermissions = context.Permissions.ToList();
+            foreach (var perm in allPermissions)
+            {
+                context.RolePermissions.Add(new RolePermission { RoleId = adminRole.Id, PermissionId = perm.Id });
+            }
+            context.SaveChanges();
+            Console.WriteLine("--> Admin rolüne tüm izinler baþarýyla tanýmlandý.");
+        }
+
+        // 4. Varsayýlan Admin Kullanýcýsýnýn Eklenmesi
+        if (!context.Users.Any())
+        {
+            var adminUser = new User
+            {
+                UserName = "admin",
+                Email = "admin@boer.com.tr",
+                PasswordHash = "SYSTEM_INITIAL_SEED_HASH" // PasswordHash IsRequired olduðu için dolduruldu
+            };
+
+            context.Users.Add(adminUser);
+            context.SaveChanges();
+
+            // Admin Kullanýcýsýna Admin Rolünün Atanmasý
+            var adminRole = context.Roles.FirstOrDefault(r => r.Name == "Admin");
+            if (adminRole != null)
+            {
+                context.UserRoles.Add(new UserRole { UserId = adminUser.Id, RoleId = adminRole.Id });
+                context.SaveChanges();
+            }
+            Console.WriteLine("--> Varsayýlan admin kullanýcýsý eklendi ve Admin rolü atandý.");
+        }
+
+        // 5. Temel Sayfalarýn (Pages) Eklenmesi
         if (!context.Pages.Any())
         {
             context.Pages.AddRange(
-                new Page { Name = "Dolly Takip", Route = "/Dolly/Index", PermissionCode = "Dolly.Read", Icon = "fa-truck", Order = 1, IsActive = true },
-                new Page { Name = "Kullanýcý Yönetimi", Route = "/Users/Index", PermissionCode = "User.Manage", Icon = "fa-users", Order = 2, IsActive = true }
+                new Page { Name = "Dolly Takip", Route = "/Home/Index", PermissionCode = "DollyView" },
+                new Page { Name = "Kullanýcý Yönetimi", Route = "/Users/Index", PermissionCode = "UserManagement" }
             );
             context.SaveChanges();
-            Console.WriteLine("--> Temel sayfa (Pages) verileri veritabanýna eklendi.");
+            Console.WriteLine("--> Temel sayfa (Pages) verileri eklendi.");
         }
 
-        Console.WriteLine("--> Veritabaný ve tablolar baþarýyla kontrol edildi / güncellendi.");
+        Console.WriteLine("--> Veritabaný, migrasyonlar ve varsayýlan veriler baþarýyla kontrol edildi.");
     }
     catch (Exception ex)
     {
