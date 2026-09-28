@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Newtonsoft.Json;
 using System.Diagnostics;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
@@ -208,73 +209,6 @@ namespace Dashboard.Controllers
         // ==========================================
 
         // 1. Kullanýcýyý THY SSO Giriþ Ekranýna Yönlendirir
-        [HttpGet]
-        [AllowAnonymous]
-        public IActionResult Login()
-        {
-            if (User.Identity?.IsAuthenticated == true)
-            {
-                return RedirectToAction("Index", "Home");
-            }
-            return View();
-        }
-
-
-        [HttpPost]
-        [AllowAnonymous]
-        public async Task<IActionResult> Login(LoginViewModel model)
-        {
-            if (!ModelState.IsValid) return View(model);
-
-            var response = await _apiService.PostAsync<LoginResponseDto, LoginViewModel>("api/auth/login", model);
-
-            if (response != null && response.IsSuccess)
-            {
-                var claims = new List<Claim>
-         {
-             new Claim(ClaimTypes.NameIdentifier, response.UserId.ToString()),
-             new Claim(ClaimTypes.Name, response.UserName)
-         };
-
-                if (!string.IsNullOrEmpty(response.Token))
-                {
-                    claims.Add(new Claim("JWToken", response.Token));
-                }
-
-                if (response.Roles != null)
-                {
-                    foreach (var role in response.Roles)
-                    {
-                        claims.Add(new Claim(ClaimTypes.Role, role));
-                    }
-                }
-
-                if (response.Permissions != null)
-                {
-                    foreach (var perm in response.Permissions)
-                    {
-                        claims.Add(new Claim("Permission", perm));
-                    }
-                }
-
-                var claimsIdentity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
-                var authProperties = new AuthenticationProperties
-                {
-                    IsPersistent = model.RememberMe
-                };
-
-                await HttpContext.SignInAsync(
-                    CookieAuthenticationDefaults.AuthenticationScheme,
-                    new ClaimsPrincipal(claimsIdentity),
-                    authProperties);
-
-                return RedirectToAction("Index", "Home");
-            }
-
-            ModelState.AddModelError("", response?.Message ?? "Kullanýcý adý veya þifre hatalý.");
-            return View(model);
-        }
-
         //[HttpGet]
         //[AllowAnonymous]
         //public IActionResult Login()
@@ -283,31 +217,98 @@ namespace Dashboard.Controllers
         //    {
         //        return RedirectToAction("Index", "Home");
         //    }
-
-        //    // CSRF ve Replay korumasý için URL-Safe Base64 üretimi (Doküman Madde 3)
-        //    byte[] stateBytes = RandomNumberGenerator.GetBytes(32);
-        //    byte[] nonceBytes = RandomNumberGenerator.GetBytes(16);
-
-        //    string state = Convert.ToBase64String(stateBytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
-        //    string nonce = Convert.ToBase64String(nonceBytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
-
-        //    var clientId = _config["OidcSettings:ClientId"] ?? "";
-        //    var redirectUri = _config["OidcSettings:RedirectUri"] ?? "";
-        //    var authorizeUrl = _config["OidcSettings:AuthorizeUrl"] ?? "";
-
-        //    // scope appsettings.json dosyasýndan okunuyor (varsayýlan: openid profile email)
-        //    var scope = _config["OidcSettings:Scope"] ?? "openid profile email";
-
-        //    // URL Parametrelerinin güvenli þekilde oluþturulmasý
-        //    string authRedirectUrl = $"{authorizeUrl}?response_type=code" +
-        //                             $"&client_id={Uri.EscapeDataString(clientId)}" +
-        //                             $"&scope={Uri.EscapeDataString(scope)}" +
-        //                             $"&redirect_uri={Uri.EscapeDataString(redirectUri)}" +
-        //                             $"&state={Uri.EscapeDataString(state)}" +
-        //                             $"&nonce={Uri.EscapeDataString(nonce)}";
-
-        //    return Redirect(authRedirectUrl);
+        //    return View();
         //}
+
+
+        //[HttpPost]
+        //[AllowAnonymous]
+        //public async Task<IActionResult> Login(LoginViewModel model)
+        //{
+        //    if (!ModelState.IsValid) return View(model);
+
+        //    var response = await _apiService.PostAsync<LoginResponseDto, LoginViewModel>("api/auth/login", model);
+
+        //    if (response != null && response.IsSuccess)
+        //    {
+        //        var claims = new List<Claim>
+        // {
+        //     new Claim(ClaimTypes.NameIdentifier, response.UserId.ToString()),
+        //     new Claim(ClaimTypes.Name, response.UserName)
+        // };
+
+        //        if (!string.IsNullOrEmpty(response.Token))
+        //        {
+        //            claims.Add(new Claim("JWToken", response.Token));
+        //        }
+
+        //        if (response.Roles != null)
+        //        {
+        //            foreach (var role in response.Roles)
+        //            {
+        //                claims.Add(new Claim(ClaimTypes.Role, role));
+        //            }
+        //        }
+
+        //        if (response.Permissions != null)
+        //        {
+        //            foreach (var perm in response.Permissions)
+        //            {
+        //                claims.Add(new Claim("Permission", perm));
+        //            }
+        //        }
+
+        //        var claimsIdentity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+        //        var authProperties = new AuthenticationProperties
+        //        {
+        //            IsPersistent = model.RememberMe
+        //        };
+
+        //        await HttpContext.SignInAsync(
+        //            CookieAuthenticationDefaults.AuthenticationScheme,
+        //            new ClaimsPrincipal(claimsIdentity),
+        //            authProperties);
+
+        //        return RedirectToAction("Index", "Home");
+        //    }
+
+        //    ModelState.AddModelError("", response?.Message ?? "Kullanýcý adý veya þifre hatalý.");
+        //    return View(model);
+        //}
+
+        [HttpGet]
+        [AllowAnonymous]
+        public IActionResult Login()
+        {
+            if (User.Identity?.IsAuthenticated == true)
+            {
+                return RedirectToAction("Index", "Home");
+            }
+
+            // CSRF ve Replay korumasý için URL-Safe Base64 üretimi (Doküman Madde 3)
+            byte[] stateBytes = RandomNumberGenerator.GetBytes(32);
+            byte[] nonceBytes = RandomNumberGenerator.GetBytes(16);
+
+            string state = Convert.ToBase64String(stateBytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+            string nonce = Convert.ToBase64String(nonceBytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+
+            var clientId = _config["OidcSettings:ClientId"] ?? "";
+            var redirectUri = _config["OidcSettings:RedirectUri"] ?? "";
+            var authorizeUrl = _config["OidcSettings:AuthorizeUrl"] ?? "";
+
+            // scope appsettings.json dosyasýndan okunuyor (varsayýlan: openid profile email)
+            var scope = _config["OidcSettings:Scope"] ?? "openid profile email";
+
+            // URL Parametrelerinin güvenli þekilde oluþturulmasý
+            string authRedirectUrl = $"{authorizeUrl}?response_type=code" +
+                                     $"&client_id={Uri.EscapeDataString(clientId)}" +
+                                     $"&scope={Uri.EscapeDataString(scope)}" +
+                                     $"&redirect_uri={Uri.EscapeDataString(redirectUri)}" +
+                                     $"&state={Uri.EscapeDataString(state)}" +
+                                     $"&nonce={Uri.EscapeDataString(nonce)}";
+
+            return Redirect(authRedirectUrl);
+        }
 
         // 2. THY Portalýndan Doðrulama Sonrasý Dönülen Callback Adresi
         [HttpGet]
@@ -316,25 +317,55 @@ namespace Dashboard.Controllers
         [AllowAnonymous]
         public async Task<IActionResult> Callback(string code, string state)
         {
+            string logPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "oidc_log.txt");
+            void Log(string msg) => System.IO.File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} - {msg}\n");
+
+            Log("1. Callback tetiklendi. Code: " + code);
+
             if (string.IsNullOrEmpty(code))
             {
+                Log("HATA: Code boþ döndü.");
                 return RedirectToAction("AccessDenied");
             }
 
-            // 1. Code -> Token Takasý
-            var tokenRequest = new
+            // --- FORM FORMATINDA TOKEN ÝSTEÐÝ ---
+            OidcTokenResponseDto tokenResponse = null;
+            try
             {
-                grant_type = "authorization_code",
-                code = code,
-                client_id = _config["OidcSettings:ClientId"],
-                redirect_uri = _config["OidcSettings:RedirectUri"]
+                using (var httpClient = new HttpClient())
+                {
+                    var tokenUrl = _config["OidcSettings:TokenUrl"];
+                    var tokenParams = new Dictionary<string, string>
+            {
+                { "grant_type", "authorization_code" },
+                { "code", code },
+                { "client_id", _config["OidcSettings:ClientId"] ?? "" },
+                { "redirect_uri", _config["OidcSettings:RedirectUri"] ?? "" }
             };
 
-            var tokenResponse = await _apiService.PostAsync<OidcTokenResponseDto, object>(
-                _config["OidcSettings:TokenUrl"] ?? "", tokenRequest);
+                    var requestContent = new FormUrlEncodedContent(tokenParams);
+
+                    Log($"1.1 Token URL'ye Form post atýlýyor: {tokenUrl}");
+                    var httpResponse = await httpClient.PostAsync(tokenUrl, requestContent);
+                    var responseContent = await httpResponse.Content.ReadAsStringAsync();
+
+                    Log($"1.2 HTTP Status: {(int)httpResponse.StatusCode} {httpResponse.StatusCode}");
+                    Log($"1.3 Response Body: {responseContent}");
+
+                    if (httpResponse.IsSuccessStatusCode)
+                    {
+                        tokenResponse = JsonConvert.DeserializeObject<OidcTokenResponseDto>(responseContent);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Log($"HATA Ex: {ex.Message}");
+            }
 
             if (tokenResponse == null || string.IsNullOrEmpty(tokenResponse.IdToken))
             {
+                Log("HATA: Token yanýtý parse edilemedi veya IdToken boþ.");
                 return RedirectToAction("AccessDenied");
             }
 
@@ -349,9 +380,13 @@ namespace Dashboard.Controllers
 
             string email = jwtToken.Claims.FirstOrDefault(c => c.Type == "email")?.Value ?? "";
 
-            // 3. API'ye Ýstek At: SsoUserResponseDto Tipinde Kullanýcýyý Çek veya Oluþtur (JIT)
+            Log($"2. Token decode edildi. Username: {username}, Email: {email}");
+
+            // 3. API'ye Ýstek At: SsoUserResponseDto
             var ssoUserDto = new { Username = username, Email = email };
             var userDetail = await _apiService.PostAsync<SsoUserResponseDto, object>("api/Users/get-or-create-sso-user", ssoUserDto);
+
+            Log($"3. API UserDetail yanýtý: {(userDetail != null ? "Baþarýlý" : "NULL")}");
 
             // 4. Claims Hazýrlýðý ve Oturum Açma
             var claims = new List<Claim>
@@ -361,21 +396,25 @@ namespace Dashboard.Controllers
         new Claim("JWToken", tokenResponse.AccessToken ?? "")
     };
 
-            // Roller Ekleniyor (String Listesi Olarak)
+            // KOÞULSUZ ÞARTSIZ TEMEL YETKÝ
+            claims.Add(new Claim("Permission", "DOLLY_VIEW"));
+            Log("4. 'DOLLY_VIEW' Claim'i eklendi.");
+
             if (userDetail?.Roles != null)
             {
                 foreach (var roleName in userDetail.Roles)
                 {
                     claims.Add(new Claim(ClaimTypes.Role, roleName));
+                    Log("Role eklendi: " + roleName);
                 }
             }
 
-            // Ýzin Kodlarý (DOLLY_VIEW, DOLLY_EDIT vb.) Ekleniyor
             if (userDetail?.Permissions != null)
             {
                 foreach (var perm in userDetail.Permissions)
                 {
                     claims.Add(new Claim("Permission", perm));
+                    Log("DB Permission eklendi: " + perm);
                 }
             }
 
@@ -385,6 +424,7 @@ namespace Dashboard.Controllers
                 CookieAuthenticationDefaults.AuthenticationScheme,
                 new ClaimsPrincipal(claimsIdentity));
 
+            Log("5. SignInAsync baþarýlý. Index'e yönlendiriliyor.");
             return RedirectToAction("Index", "Home");
         }
 
@@ -419,10 +459,19 @@ namespace Dashboard.Controllers
 
     public class OidcTokenResponseDto
     {
-        public string? AccessToken { get; set; }
-        public string? RefreshToken { get; set; }
-        public string? IdToken { get; set; }
-        public string? TokenType { get; set; }
+        [JsonProperty("access_token")]
+        public string AccessToken { get; set; }
+
+        [JsonProperty("id_token")]
+        public string IdToken { get; set; }
+
+        [JsonProperty("refresh_token")]
+        public string RefreshToken { get; set; }
+
+        [JsonProperty("token_type")]
+        public string TokenType { get; set; }
+
+        [JsonProperty("expires_in")]
         public int ExpiresIn { get; set; }
     }
     public class SsoUserResponseDto
