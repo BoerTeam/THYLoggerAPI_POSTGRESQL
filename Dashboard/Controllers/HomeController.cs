@@ -325,10 +325,10 @@ namespace Dashboard.Controllers
             if (string.IsNullOrEmpty(code))
             {
                 Log("HATA: Code boþ döndü.");
-                return RedirectToAction("AccessDenied");
+                return RedirectToAction("AccessDenied", "Home");
             }
 
-            // --- FORM FORMATINDA TOKEN ÝSTEÐÝ ---
+            // 1. FORM FORMATINDA TOKEN ÝSTEÐÝ
             OidcTokenResponseDto tokenResponse = null;
             try
             {
@@ -354,7 +354,20 @@ namespace Dashboard.Controllers
 
                     if (httpResponse.IsSuccessStatusCode)
                     {
-                        tokenResponse = JsonConvert.DeserializeObject<OidcTokenResponseDto>(responseContent);
+                        // JObject kullanarak snake_case (id_token, access_token) isim uyuþmazlýðýný çözüyoruz
+                        var jsonObj = Newtonsoft.Json.Linq.JObject.Parse(responseContent);
+                        string idToken = jsonObj["id_token"]?.ToString() ?? "";
+                        string accessToken = jsonObj["access_token"]?.ToString() ?? "";
+
+                        if (!string.IsNullOrEmpty(idToken))
+                        {
+                            tokenResponse = new OidcTokenResponseDto
+                            {
+                                IdToken = idToken,
+                                AccessToken = accessToken
+                            };
+                            Log("1.4 IdToken ve AccessToken baþarýyla ayrýþtýrýldý.");
+                        }
                     }
                 }
             }
@@ -366,65 +379,89 @@ namespace Dashboard.Controllers
             if (tokenResponse == null || string.IsNullOrEmpty(tokenResponse.IdToken))
             {
                 Log("HATA: Token yanýtý parse edilemedi veya IdToken boþ.");
-                return RedirectToAction("AccessDenied");
+                return RedirectToAction("AccessDenied", "Home");
             }
 
-            // 2. ID Token Decode Etme
+            // 2. ID TOKEN DECODE ETME
             var handler = new JwtSecurityTokenHandler();
             var jwtToken = handler.ReadJwtToken(tokenResponse.IdToken);
 
             string username = jwtToken.Claims.FirstOrDefault(c =>
                 c.Type == "preferred_username" ||
                 c.Type == "unique_name" ||
-                c.Type == "sub")?.Value ?? "";
+                c.Type == "sub" ||
+                c.Type == "username")?.Value ?? "";
 
             string email = jwtToken.Claims.FirstOrDefault(c => c.Type == "email")?.Value ?? "";
 
             Log($"2. Token decode edildi. Username: {username}, Email: {email}");
 
-            // 3. API'ye Ýstek At: SsoUserResponseDto
+            // 3. API'YE ÝSTEK AT: (JIT - User Get or Create)
             var ssoUserDto = new { Username = username, Email = email };
             var userDetail = await _apiService.PostAsync<SsoUserResponseDto, object>("api/Users/get-or-create-sso-user", ssoUserDto);
 
             Log($"3. API UserDetail yanýtý: {(userDetail != null ? "Baþarýlý" : "NULL")}");
 
-            // 4. Claims Hazýrlýðý ve Oturum Açma
+            // 4. CLAIMS HAZIRLIÐI VE ROL / YETKÝ ATAMALARI
             var claims = new List<Claim>
     {
         new Claim(ClaimTypes.NameIdentifier, userDetail?.UserId.ToString() ?? username),
         new Claim(ClaimTypes.Name, userDetail?.UserName ?? username),
+        new Claim(ClaimTypes.Email, email),
         new Claim("JWToken", tokenResponse.AccessToken ?? "")
     };
 
-            // KOÞULSUZ ÞARTSIZ TEMEL YETKÝ
-            claims.Add(new Claim("Permission", "DOLLY_VIEW"));
-            Log("4. 'DOLLY_VIEW' Claim'i eklendi.");
+            // Appsettings içinden Admin Kullanýcý Adý Listesini Okuma
+            var adminUsers = _config.GetSection("OidcSettings:AdminUsers").Get<List<string>>() ?? new List<string>();
 
-            if (userDetail?.Roles != null)
+            // Eðer giren kullanýcý Admin listesindeyse (veya veritabanýndan Admin rolü geldiyse)
+            bool isAdmin = adminUsers.Any(a => a.Equals(username, StringComparison.OrdinalIgnoreCase)) ||
+                           (userDetail?.Roles != null && userDetail.Roles.Contains("Admin"));
+
+            if (isAdmin)
             {
-                foreach (var roleName in userDetail.Roles)
+                // Admin Kullanýcý için Tüm Sayfa ve Ýþlem Ýzinleri Tanýmlanýyor
+                claims.Add(new Claim(ClaimTypes.Role, "Admin"));
+                claims.Add(new Claim("Permission", "DOLLY_VIEW"));
+                claims.Add(new Claim("Permission", "DOLLY_EDIT"));
+                claims.Add(new Claim("Permission", "UserManagement"));
+                claims.Add(new Claim("Permission", "PUBLIC"));
+
+                Log($"4. ADMIN GÝRÝÞÝ: '{username}' kullanýcýsýna tüm yetkiler (DOLLY_VIEW, DOLLY_EDIT, UserManagement) tanýmlandý.");
+            }
+            else
+            {
+                // Standart Kullanýcý Ýzinleri
+                claims.Add(new Claim("Permission", "DOLLY_VIEW"));
+                Log("4. Standart Kullanýcý: 'DOLLY_VIEW' yetkisi tanýmlandý.");
+
+                if (userDetail?.Roles != null)
                 {
-                    claims.Add(new Claim(ClaimTypes.Role, roleName));
-                    Log("Role eklendi: " + roleName);
+                    foreach (var roleName in userDetail.Roles)
+                    {
+                        claims.Add(new Claim(ClaimTypes.Role, roleName));
+                        Log("Role eklendi: " + roleName);
+                    }
+                }
+
+                if (userDetail?.Permissions != null)
+                {
+                    foreach (var perm in userDetail.Permissions)
+                    {
+                        claims.Add(new Claim("Permission", perm));
+                        Log("DB Permission eklendi: " + perm);
+                    }
                 }
             }
 
-            if (userDetail?.Permissions != null)
-            {
-                foreach (var perm in userDetail.Permissions)
-                {
-                    claims.Add(new Claim("Permission", perm));
-                    Log("DB Permission eklendi: " + perm);
-                }
-            }
-
+            // 5. OTURUM AÇMA
             var claimsIdentity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
 
             await HttpContext.SignInAsync(
                 CookieAuthenticationDefaults.AuthenticationScheme,
                 new ClaimsPrincipal(claimsIdentity));
 
-            Log("5. SignInAsync baþarýlý. Index'e yönlendiriliyor.");
+            Log("5. SignInAsync baþarýlý. Ana sayfaya yönlendiriliyor.");
             return RedirectToAction("Index", "Home");
         }
 
