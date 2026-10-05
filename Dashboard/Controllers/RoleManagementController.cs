@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Dashboard.Controllers
 {
-    [Authorize(Policy = "UserView")]
+    [Authorize]
     public class RoleManagementController : Controller
     {
         private readonly IApiService _apiService;
@@ -14,9 +14,15 @@ namespace Dashboard.Controllers
             _apiService = apiService;
         }
 
+        // Rol & Yetki Yönetimi Sayfası - Yalnızca ROLE_MANAGEMENT veya Admin
         [HttpGet]
         public async Task<IActionResult> Index()
         {
+            if (!User.HasClaim("Permission", "ROLE_MANAGEMENT") && !User.IsInRole("Admin"))
+            {
+                return RedirectToAction("AccessDenied", "Home");
+            }
+
             var roles = await _apiService.GetAsync<List<RoleItemDto>>("api/Roles") ?? new List<RoleItemDto>();
             var permissions = await _apiService.GetAsync<List<PermissionItemDto>>("api/Roles/permissions") ?? new List<PermissionItemDto>();
 
@@ -24,9 +30,15 @@ namespace Dashboard.Controllers
             return View("~/Views/RoleManagement/Index.cshtml", roles);
         }
 
+        // Yeni Rol Oluşturma - Yalnızca ROLE_MANAGEMENT veya Admin
         [HttpPost]
         public async Task<IActionResult> CreateRole(CreateRoleViewModel model)
         {
+            if (!User.HasClaim("Permission", "ROLE_MANAGEMENT") && !User.IsInRole("Admin"))
+            {
+                return RedirectToAction("AccessDenied", "Home");
+            }
+
             if (!ModelState.IsValid)
             {
                 return RedirectToAction("Index");
@@ -45,9 +57,16 @@ namespace Dashboard.Controllers
 
             return RedirectToAction("Index");
         }
+
+        // Rol Güncelleme - Yalnızca ROLE_MANAGEMENT veya Admin
         [HttpPost]
         public async Task<IActionResult> UpdateRole(UpdateRoleViewModel model)
         {
+            if (!User.HasClaim("Permission", "ROLE_MANAGEMENT") && !User.IsInRole("Admin"))
+            {
+                return RedirectToAction("AccessDenied", "Home");
+            }
+
             if (!ModelState.IsValid) return RedirectToAction("Index");
 
             var isSuccess = await _apiService.PutAsync("api/Roles/Update", model);
@@ -60,9 +79,15 @@ namespace Dashboard.Controllers
             return RedirectToAction("Index");
         }
 
+        // Rol Silme - Yalnızca ROLE_MANAGEMENT veya Admin
         [HttpPost]
         public async Task<IActionResult> DeleteRole(int id)
         {
+            if (!User.HasClaim("Permission", "ROLE_MANAGEMENT") && !User.IsInRole("Admin"))
+            {
+                return RedirectToAction("AccessDenied", "Home");
+            }
+
             var isSuccess = await _apiService.DeleteAsync($"api/Roles/Delete/{id}");
 
             if (isSuccess)

@@ -28,9 +28,14 @@ namespace Dashboard.Controllers
             _config = config;
         }
 
-        [Authorize(Policy = "DollyView")]
+        // Ana Sayfa (Dashboard) - Yalnýzca DASHBOARD_VIEW veya Admin
         public async Task<IActionResult> Index()
         {
+            if (!User.HasClaim("Permission", "DASHBOARD_VIEW") && !User.IsInRole("Admin"))
+            {
+                return RedirectToAction("AccessDenied", "Home");
+            }
+
             var nemTask = _apiService.GetAsync<List<Nem>>("api/Nem/GetAll");
             var sicaklikTask = _apiService.GetAsync<List<Sicaklik>>("api/Sicaklik/GetAll");
             var dolubosTask = _apiService.GetAsync<List<BosDolu>>("api/DoluBos/GetAll");
@@ -50,12 +55,15 @@ namespace Dashboard.Controllers
 
             return View(multiModel);
         }
+
         [HttpGet]
-        [Authorize]
         public async Task<IActionResult> ExportToExcel(int? dollyId, DateTime startDate, DateTime endDate)
         {
-            // 1. Arayüzden gelen baþlangýç ve bitiþ tarihlerini UTC dönüþtürmeden doðrudan sýnýr olarak alýyoruz.
-            // Böylece kullanýcýnýn seçtiði saat (Örn: 10:30 - 14:00) birebir korunur.
+            if (!User.HasClaim("Permission", "DOLLY_VIEW") && !User.IsInRole("Admin"))
+            {
+                return RedirectToAction("AccessDenied", "Home");
+            }
+
             DateTime filterStart = startDate;
             DateTime filterEnd = endDate;
 
@@ -67,7 +75,6 @@ namespace Dashboard.Controllers
             var dollyDict = tumDollyler.ToDictionary(x => x.Id, x => x.Name);
             var trCulture = new System.Globalization.CultureInfo("tr-TR");
 
-            // 2. Filtreleme Mantýðý: Veritabanýndan gelen saati doðrudan karþýlaþtýrýyoruz
             var filteredSicaklik = tumSicakliklar
                 .Where(x => (!dollyId.HasValue || x.DollyId == dollyId) &&
                             x.Time.HasValue &&
@@ -168,10 +175,15 @@ namespace Dashboard.Controllers
                 }
             }
         }
+
         [HttpGet]
-        [Authorize(Policy = "DollyView")]
         public async Task<JsonResult> GetLatestData(int id)
         {
+            if (!User.HasClaim("Permission", "DOLLY_VIEW") && !User.IsInRole("Admin"))
+            {
+                return Json(new { error = "Yetkisiz eriþim" });
+            }
+
             var sicakliklar = await _apiService.GetAsync<List<Sicaklik>>("api/Sicaklik") ?? new List<Sicaklik>();
             var nemler = await _apiService.GetAsync<List<Nem>>("api/Nem/Get") ?? new List<Nem>();
             var gpsler = await _apiService.GetAsync<List<Gpsdatum>>("api/Gps/Get") ?? new List<Gpsdatum>();
@@ -193,9 +205,13 @@ namespace Dashboard.Controllers
         }
 
         [HttpGet]
-        [Authorize(Policy = "DollyView")]
         public async Task<IActionResult> GetHistoryData(int id, DateTime? start, DateTime? end)
         {
+            if (!User.HasClaim("Permission", "DOLLY_VIEW") && !User.IsInRole("Admin"))
+            {
+                return Json(new { error = "Yetkisiz eriþim" });
+            }
+
             var queryParams = new Dictionary<string, string> { { "id", id.ToString() } };
             if (start.HasValue) queryParams.Add("start", start.Value.ToString("yyyy-MM-ddTHH:mm:ss"));
             if (end.HasValue) queryParams.Add("end", end.Value.ToString("yyyy-MM-ddTHH:mm:ss"));
@@ -208,74 +224,6 @@ namespace Dashboard.Controllers
         // OIDC / THY SSO ENTEGRASYON ALANI
         // ==========================================
 
-        // 1. Kullanýcýyý THY SSO Giriþ Ekranýna Yönlendirir
-        //[HttpGet]
-        //[AllowAnonymous]
-        //public IActionResult Login()
-        //{
-        //    if (User.Identity?.IsAuthenticated == true)
-        //    {
-        //        return RedirectToAction("Index", "Home");
-        //    }
-        //    return View();
-        //}
-
-
-        //[HttpPost]
-        //[AllowAnonymous]
-        //public async Task<IActionResult> Login(LoginViewModel model)
-        //{
-        //    if (!ModelState.IsValid) return View(model);
-
-        //    var response = await _apiService.PostAsync<LoginResponseDto, LoginViewModel>("api/auth/login", model);
-
-        //    if (response != null && response.IsSuccess)
-        //    {
-        //        var claims = new List<Claim>
-        // {
-        //     new Claim(ClaimTypes.NameIdentifier, response.UserId.ToString()),
-        //     new Claim(ClaimTypes.Name, response.UserName)
-        // };
-
-        //        if (!string.IsNullOrEmpty(response.Token))
-        //        {
-        //            claims.Add(new Claim("JWToken", response.Token));
-        //        }
-
-        //        if (response.Roles != null)
-        //        {
-        //            foreach (var role in response.Roles)
-        //            {
-        //                claims.Add(new Claim(ClaimTypes.Role, role));
-        //            }
-        //        }
-
-        //        if (response.Permissions != null)
-        //        {
-        //            foreach (var perm in response.Permissions)
-        //            {
-        //                claims.Add(new Claim("Permission", perm));
-        //            }
-        //        }
-
-        //        var claimsIdentity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
-        //        var authProperties = new AuthenticationProperties
-        //        {
-        //            IsPersistent = model.RememberMe
-        //        };
-
-        //        await HttpContext.SignInAsync(
-        //            CookieAuthenticationDefaults.AuthenticationScheme,
-        //            new ClaimsPrincipal(claimsIdentity),
-        //            authProperties);
-
-        //        return RedirectToAction("Index", "Home");
-        //    }
-
-        //    ModelState.AddModelError("", response?.Message ?? "Kullanýcý adý veya þifre hatalý.");
-        //    return View(model);
-        //}
-
         [HttpGet]
         [AllowAnonymous]
         public IActionResult Login()
@@ -285,7 +233,6 @@ namespace Dashboard.Controllers
                 return RedirectToAction("Index", "Home");
             }
 
-            // CSRF ve Replay korumasý için URL-Safe Base64 üretimi (Doküman Madde 3)
             byte[] stateBytes = RandomNumberGenerator.GetBytes(32);
             byte[] nonceBytes = RandomNumberGenerator.GetBytes(16);
 
@@ -295,11 +242,8 @@ namespace Dashboard.Controllers
             var clientId = _config["OidcSettings:ClientId"] ?? "";
             var redirectUri = _config["OidcSettings:RedirectUri"] ?? "";
             var authorizeUrl = _config["OidcSettings:AuthorizeUrl"] ?? "";
-
-            // scope appsettings.json dosyasýndan okunuyor (varsayýlan: openid profile email)
             var scope = _config["OidcSettings:Scope"] ?? "openid profile email";
 
-            // URL Parametrelerinin güvenli þekilde oluþturulmasý
             string authRedirectUrl = $"{authorizeUrl}?response_type=code" +
                                      $"&client_id={Uri.EscapeDataString(clientId)}" +
                                      $"&scope={Uri.EscapeDataString(scope)}" +
@@ -310,7 +254,6 @@ namespace Dashboard.Controllers
             return Redirect(authRedirectUrl);
         }
 
-        // 2. THY Portalýndan Doðrulama Sonrasý Dönülen Callback Adresi
         [HttpGet]
         [Route("Callback")]
         [Route("Home/Callback")]
@@ -328,7 +271,6 @@ namespace Dashboard.Controllers
                 return RedirectToAction("AccessDenied", "Home");
             }
 
-            // 1. FORM FORMATINDA TOKEN ÝSTEÐÝ
             OidcTokenResponseDto tokenResponse = null;
             try
             {
@@ -336,12 +278,12 @@ namespace Dashboard.Controllers
                 {
                     var tokenUrl = _config["OidcSettings:TokenUrl"];
                     var tokenParams = new Dictionary<string, string>
-            {
-                { "grant_type", "authorization_code" },
-                { "code", code },
-                { "client_id", _config["OidcSettings:ClientId"] ?? "" },
-                { "redirect_uri", _config["OidcSettings:RedirectUri"] ?? "" }
-            };
+                    {
+                        { "grant_type", "authorization_code" },
+                        { "code", code },
+                        { "client_id", _config["OidcSettings:ClientId"] ?? "" },
+                        { "redirect_uri", _config["OidcSettings:RedirectUri"] ?? "" }
+                    };
 
                     var requestContent = new FormUrlEncodedContent(tokenParams);
 
@@ -354,7 +296,6 @@ namespace Dashboard.Controllers
 
                     if (httpResponse.IsSuccessStatusCode)
                     {
-                        // JObject kullanarak snake_case (id_token, access_token) isim uyuþmazlýðýný çözüyoruz
                         var jsonObj = Newtonsoft.Json.Linq.JObject.Parse(responseContent);
                         string idToken = jsonObj["id_token"]?.ToString() ?? "";
                         string accessToken = jsonObj["access_token"]?.ToString() ?? "";
@@ -382,7 +323,6 @@ namespace Dashboard.Controllers
                 return RedirectToAction("AccessDenied", "Home");
             }
 
-            // 2. ID TOKEN DECODE ETME
             var handler = new JwtSecurityTokenHandler();
             var jwtToken = handler.ReadJwtToken(tokenResponse.IdToken);
 
@@ -396,45 +336,47 @@ namespace Dashboard.Controllers
 
             Log($"2. Token decode edildi. Username: {username}, Email: {email}");
 
-            // 3. API'YE ÝSTEK AT: (JIT - User Get or Create)
             var ssoUserDto = new { Username = username, Email = email };
             var userDetail = await _apiService.PostAsync<SsoUserResponseDto, object>("api/Users/get-or-create-sso-user", ssoUserDto);
 
             Log($"3. API UserDetail yanýtý: {(userDetail != null ? "Baþarýlý" : "NULL")}");
 
-            // 4. CLAIMS HAZIRLIÐI VE ROL / YETKÝ ATAMALARI
             var claims = new List<Claim>
-    {
-        new Claim(ClaimTypes.NameIdentifier, userDetail?.UserId.ToString() ?? username),
-        new Claim(ClaimTypes.Name, userDetail?.UserName ?? username),
-        new Claim(ClaimTypes.Email, email),
-        new Claim("JWToken", tokenResponse.AccessToken ?? "")
-    };
+            {
+                new Claim(ClaimTypes.NameIdentifier, userDetail?.UserId.ToString() ?? username),
+                new Claim(ClaimTypes.Name, userDetail?.UserName ?? username),
+                new Claim(ClaimTypes.Email, email),
+                new Claim("JWToken", tokenResponse.AccessToken ?? "")
+            };
 
-            // Appsettings içinden Admin Kullanýcý Adý Listesini Okuma
             var adminUsers = _config.GetSection("OidcSettings:AdminUsers").Get<List<string>>() ?? new List<string>();
 
-            // Eðer giren kullanýcý Admin listesindeyse (veya veritabanýndan Admin rolü geldiyse)
             bool isAdmin = adminUsers.Any(a => a.Equals(username, StringComparison.OrdinalIgnoreCase)) ||
                            (userDetail?.Roles != null && userDetail.Roles.Contains("Admin"));
 
             if (isAdmin)
             {
-                // Admin Kullanýcý için Tüm Sayfa ve Ýþlem Ýzinleri Tanýmlanýyor
+                // Admin Kullanýcýsýna TÜM SAYFA ÝZÝNLERÝ YÜKLENÝYOR
                 claims.Add(new Claim(ClaimTypes.Role, "Admin"));
+                claims.Add(new Claim("Permission", "DASHBOARD_VIEW"));
                 claims.Add(new Claim("Permission", "DOLLY_VIEW"));
                 claims.Add(new Claim("Permission", "DOLLY_EDIT"));
-                claims.Add(new Claim("Permission", "UserManagement"));
-                claims.Add(new Claim("Permission", "PUBLIC"));
+                claims.Add(new Claim("Permission", "USER_MANAGEMENT"));
+                claims.Add(new Claim("Permission", "ROLE_MANAGEMENT"));
 
-                Log($"4. ADMIN GÝRÝÞÝ: '{username}' kullanýcýsýna tüm yetkiler (DOLLY_VIEW, DOLLY_EDIT, UserManagement) tanýmlandý.");
+                Log($"4. ADMIN GÝRÝÞÝ: '{username}' kullanýcýsýna tüm sayfa yetkileri tanýmlandý.");
             }
             else
             {
-                // Standart Kullanýcý Ýzinleri
-                claims.Add(new Claim("Permission", "DOLLY_VIEW"));
-                Log("4. Standart Kullanýcý: 'DOLLY_VIEW' yetkisi tanýmlandý.");
+                // --------------------------------------------------------------------------
+                // VARSAYILAN (DEFAULT) YETKÝ: HÝÇBÝR YETKÝSÝ OLMASA DAHÝ DOLLY_VIEW VERÝLÝYOR
+                // --------------------------------------------------------------------------
+              
+                claims.Add(new Claim("Permission", "DASHBOARD_VIEW")); // Ana sayfayý (Home/Index) görebilmesi için
 
+                Log("4. Standart / Yeni Kullanýcý: Varsayýlan olarak 'DASHBOARD_VIEW' ve 'DOLLY_VIEW' yetkisi tanýmlandý.");
+
+                // Eðer DB'de özel tanýmlanmýþ ek rolleri varsa yükle
                 if (userDetail?.Roles != null)
                 {
                     foreach (var roleName in userDetail.Roles)
@@ -444,17 +386,21 @@ namespace Dashboard.Controllers
                     }
                 }
 
+                // Eðer DB'de özel tanýmlanmýþ ekstra izinleri varsa yükle
                 if (userDetail?.Permissions != null)
                 {
                     foreach (var perm in userDetail.Permissions)
                     {
-                        claims.Add(new Claim("Permission", perm));
-                        Log("DB Permission eklendi: " + perm);
+                        // Mükerrer (tekrar eden) claim eklememek için kontrol
+                        if (!claims.Any(c => c.Type == "Permission" && c.Value == perm))
+                        {
+                            claims.Add(new Claim("Permission", perm));
+                            Log("DB Permission eklendi: " + perm);
+                        }
                     }
                 }
             }
 
-            // 5. OTURUM AÇMA
             var claimsIdentity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
 
             await HttpContext.SignInAsync(
@@ -466,10 +412,32 @@ namespace Dashboard.Controllers
         }
 
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> Logout()
         {
             await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-            return RedirectToAction("Login", "Home");
+
+            if (Request.Cookies.ContainsKey("oidc_state"))
+            {
+                Response.Cookies.Delete("oidc_state");
+            }
+
+            string authorizeUrl = _config["OidcSettings:AuthorizeUrl"];
+            string clientId = _config["OidcSettings:ClientId"];
+            string redirectUri = _config["OidcSettings:RedirectUri"];
+            string scope = _config["OidcSettings:Scope"] ?? "openid profile email";
+            string state = Guid.NewGuid().ToString("N");
+
+            Response.Cookies.Append("oidc_state", state, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = true,
+                Expires = DateTimeOffset.Now.AddMinutes(5)
+            });
+
+            string ssoLoginUrl = $"{authorizeUrl}?response_type=code&client_id={clientId}&scope={Uri.EscapeDataString(scope)}&redirect_uri={Uri.EscapeDataString(redirectUri)}&state={state}";
+
+            return Redirect(ssoLoginUrl);
         }
 
         [AllowAnonymous]
@@ -511,6 +479,7 @@ namespace Dashboard.Controllers
         [JsonProperty("expires_in")]
         public int ExpiresIn { get; set; }
     }
+
     public class SsoUserResponseDto
     {
         public int UserId { get; set; }

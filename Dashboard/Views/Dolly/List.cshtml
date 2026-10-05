@@ -4,78 +4,87 @@
     Layout = "_Layout";
     ViewData["Title"] = "Dolly Listesi";
 
-    // Yetki kontrollerini Razor değişkenlerine alıyoruz
-    bool canAdd = User.HasClaim("Permission", "DOLLY_ADD") || User.IsInRole("Admin");
+    // Tekil işlem yetkileri
     bool canEdit = User.HasClaim("Permission", "DOLLY_EDIT") || User.IsInRole("Admin");
 }
 
-<div class="card">
-    <div class="card-header border-bottom d-flex justify-content-between align-items-center">
-        <h4 class="card-title">Dolly Listesi</h4>
-
-        @* Kullanıcının DOLLY_ADD yetkisi varsa ekleme butonunu göster *@
-        @if (canAdd)
-        {
-            <a href="/Dolly/AddDolly" class="btn btn-primary btn-sm">
-                <i data-feather="plus"></i> Yeni Dolly Ekle
-            </a>
-        }
+@if (!User.HasClaim("Permission", "DOLLY_VIEW") && !User.IsInRole("Admin"))
+{
+    <div class="alert alert-danger p-2 m-3" role="alert">
+        <h4 class="alert-heading">🔒 Yetkisiz Erişim!</h4>
+        <p class="mb-0">Dolly Listesi modülünü görüntülemek için gerekli izne sahip değilsiniz.</p>
     </div>
+}
+else
+{
+    <div class="card">
+        <div class="card-header border-bottom d-flex justify-content-between align-items-center">
+            <h4 class="card-title">Dolly Listesi</h4>
 
-    <div class="card-body">
-        <div class="table-responsive">
-            <table class="table table-hover">
-                <thead class="table-light">
-                    <tr>
-                        <th>Seri Numarası</th>
-                        <th>İsim</th>
-                        <th>Durum</th>
-                        <th class="text-center">İşlemler</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @if (Model != null && Model.Any())
-                    {
-                        @foreach (var item in Model)
+            @* Kullanıcının DOLLY_EDIT yetkisi varsa ekleme butonunu göster *@
+            @if (canEdit)
+            {
+                <a href="/Dolly/AddDolly" class="btn btn-primary btn-sm">
+                    <i data-feather="plus"></i> Yeni Dolly Ekle
+                </a>
+            }
+        </div>
+
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Seri Numarası</th>
+                            <th>İsim</th>
+                            <th>Durum</th>
+                            <th class="text-center">İşlemler</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (Model != null && Model.Any())
+                        {
+                            @foreach (var item in Model)
+                            {
+                                <tr>
+                                    <td>@item.SerialNumber</td>
+                                    <td>@item.Name</td>
+                                    <td>
+                                        @if (item.IsActive)
+                                        {
+                                            <span class="badge rounded-pill bg-light-success text-success">Aktif</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge rounded-pill bg-light-danger text-danger">Pasif</span>
+                                        }
+                                    </td>
+                                    <td class="text-center">
+                                        @* Kullanıcının DOLLY_EDIT yetkisi varsa düzenle butonunu göster *@
+                                        @if (canEdit)
+                                        {
+                                            <a href="/Dolly/Edit/@item.Id" class="btn btn-sm btn-icon btn-flat-primary" title="Düzenle">
+                                                <i data-feather="edit"></i>
+                                                <span class="ms-25">Düzenle</span>
+                                            </a>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted small">Yetki Yok</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        }
+                        else
                         {
                             <tr>
-                                <td>@item.SerialNumber</td>
-                                <td>@item.Name</td>
-                                <td>
-                                    @if (item.IsActive)
-                                    {
-                                        <span class="badge rounded-pill bg-light-success text-success">Aktif</span>
-                                    }
-                                    else
-                                    {
-                                        <span class="badge rounded-pill bg-light-danger text-danger">Pasif</span>
-                                    }
-                                </td>
-                                <td class="text-center">
-                                    @* Kullanıcının DOLLY_EDIT yetkisi varsa düzenle butonunu göster *@
-                                    @if (canEdit)
-                                    {
-                                        <a href="/Dolly/Edit/@item.Id" class="btn btn-sm btn-icon btn-flat-primary" title="Düzenle">
-                                            <i data-feather="edit"></i>
-                                            <span class="ms-25">Düzenle</span>
-                                        </a>
-                                    }
-                                    else
-                                    {
-                                        <span class="text-muted small">Yetki Yok</span>
-                                    }
-                                </td>
+                                <td colspan="4" class="text-center text-muted">Kayıtlı Dolly bulunamadı.</td>
                             </tr>
                         }
-                    }
-                    else
-                    {
-                        <tr>
-                            <td colspan="4" class="text-center text-muted">Kayıtlı Dolly bulunamadı.</td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
-</div>
+}

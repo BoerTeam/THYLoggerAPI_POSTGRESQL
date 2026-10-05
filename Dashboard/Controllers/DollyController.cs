@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Dashboard.Controllers
 {
-    [Authorize(Policy = "DollyView")]
+    [Authorize]
     public class DollyController : Controller
     {
         private readonly IApiService _apiService;
@@ -16,24 +16,41 @@ namespace Dashboard.Controllers
             _apiService = apiService;
         }
 
+        // Dolly Listesi - Yalnızca DOLLY_VIEW veya Admin
         [HttpGet]
         public async Task<IActionResult> Index()
         {
+            if (!User.HasClaim("Permission", "DOLLY_VIEW") && !User.IsInRole("Admin"))
+            {
+                return RedirectToAction("AccessDenied", "Home");
+            }
+
             var dollyList = await _apiService.GetAsync<List<Dolly>>("api/Dolly/GetAll") ?? new List<Dolly>();
             return View(dollyList);
         }
 
+        // Dolly Listesi (Alternatif Route) - Yalnızca DOLLY_VIEW veya Admin
         [HttpGet]
         public async Task<IActionResult> List()
         {
+            if (!User.HasClaim("Permission", "DOLLY_VIEW") && !User.IsInRole("Admin"))
+            {
+                return RedirectToAction("AccessDenied", "Home");
+            }
+
             var dollyList = await _apiService.GetAsync<List<Dolly>>("api/Dolly/GetAll") ?? new List<Dolly>();
             return View(dollyList);
         }
 
+        // Dolly Düzenleme Sayfası - Yalnızca DOLLY_EDIT veya Admin
         [HttpGet]
-        [Authorize(Policy = "DollyEdit")]
         public async Task<IActionResult> Edit(int id)
         {
+            if (!User.HasClaim("Permission", "DOLLY_EDIT") && !User.IsInRole("Admin"))
+            {
+                return RedirectToAction("AccessDenied", "Home");
+            }
+
             var dolly = await _apiService.GetAsync<Dolly>($"api/Dolly/GetById/{id}");
             if (dolly == null)
             {
@@ -43,11 +60,16 @@ namespace Dashboard.Controllers
             return View(dolly);
         }
 
+        // Dolly Düzenleme Kayıt - Yalnızca DOLLY_EDIT veya Admin
         [HttpPost]
         [ValidateAntiForgeryToken]
-        [Authorize(Policy = "DollyEdit")]
         public async Task<IActionResult> Edit(Dolly model)
         {
+            if (!User.HasClaim("Permission", "DOLLY_EDIT") && !User.IsInRole("Admin"))
+            {
+                return RedirectToAction("AccessDenied", "Home");
+            }
+
             if (!ModelState.IsValid)
             {
                 return View(model);
@@ -64,18 +86,28 @@ namespace Dashboard.Controllers
             return View(model);
         }
 
+        // Dolly Ekleme Sayfası - Yalnızca DOLLY_EDIT veya Admin
         [HttpGet]
-        [Authorize(Policy = "DollyAdd")]
         public IActionResult AddDolly()
         {
+            if (!User.HasClaim("Permission", "DOLLY_EDIT") && !User.IsInRole("Admin"))
+            {
+                return RedirectToAction("AccessDenied", "Home");
+            }
+
             return View(new Dolly { IsActive = true });
         }
 
+        // Dolly Ekleme Kayıt - Yalnızca DOLLY_EDIT veya Admin
         [HttpPost]
         [ValidateAntiForgeryToken]
-        [Authorize(Policy = "DollyAdd")]
         public async Task<IActionResult> AddDolly(Dolly model)
         {
+            if (!User.HasClaim("Permission", "DOLLY_EDIT") && !User.IsInRole("Admin"))
+            {
+                return RedirectToAction("AccessDenied", "Home");
+            }
+
             ModelState.Remove("Id");
             ModelState.Remove("CreatedAt");
             ModelState.Remove("UpdatedAt");
