@@ -169,22 +169,21 @@ else
             });
 
             document.addEventListener("DOMContentLoaded", function () {
-                const chartOptions = {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: { y: { beginAtZero: false } }
-                };
+                // Y ekseni sabit: nem 0-100, sicaklik en az 0-25 (deger tasarsa eksen genisler)
+                const baseOptions = { responsive: true, maintainAspectRatio: false };
+                const humOptions = { ...baseOptions, scales: { y: { min: 0, max: 100 } } };
+                const tempOptions = { ...baseOptions, scales: { y: { min: 0, suggestedMax: 25 } } };
 
                 tempChart = new Chart(document.getElementById('tempChart'), {
                     type: 'line',
                     data: { labels: [], datasets: [{ label: 'Sıcaklık (°C)', borderColor: '#ea5455', backgroundColor: 'rgba(234, 84, 85, 0.1)', data: [], fill: true, tension: 0.3 }] },
-                    options: chartOptions
+                    options: tempOptions
                 });
 
                 humChart = new Chart(document.getElementById('humidityChart'), {
                     type: 'line',
                     data: { labels: [], datasets: [{ label: 'Nem (%)', borderColor: '#00cfe8', backgroundColor: 'rgba(0, 207, 232, 0.1)', data: [], fill: true, tension: 0.3 }] },
-                    options: chartOptions
+                    options: humOptions
                 });
 
                 document.querySelectorAll('.doly-card').forEach(card => {
