@@ -188,6 +188,14 @@ else
                 }, true);
             }
 
+            // Modal acikken aria-hidden="true" kalirsa odaklanan alanlar icin tarayici uyarisi olusur; acikken temizle
+            document.addEventListener('DOMContentLoaded', function () {
+                const m = document.getElementById('xlargeModal');
+                new MutationObserver(() => {
+                    if (m.classList.contains('show') && m.getAttribute('aria-hidden') === 'true') m.removeAttribute('aria-hidden');
+                }).observe(m, { attributes: true, attributeFilter: ['aria-hidden', 'class'] });
+            });
+
             let currentRange = { hours: 24 };
 
             async function loadCharts(range) {
@@ -241,7 +249,7 @@ else
                 const chartPickerOpts = {
                     enableTime: true, time_24hr: true, altInput: true, altFormat: 'd/m/Y H:i',
                     dateFormat: 'Y-m-d\\TH:i', locale: { firstDayOfWeek: 1 },
-                    appendTo: document.getElementById('xlargeModal')
+                    static: true
                 };
                 chartStartPicker = flatpickr('#chartStart', chartPickerOpts);
                 chartEndPicker = flatpickr('#chartEnd', chartPickerOpts);
@@ -264,7 +272,7 @@ else
                     altFormat: 'd/m/Y H:i',
                     dateFormat: 'Y-m-d\TH:i',
                     locale: { firstDayOfWeek: 1 },
-                    appendTo: document.getElementById('xlargeModal')
+                    static: true
                 });
                 wirePickerClosing(excelPickers);
             });
