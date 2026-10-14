@@ -270,10 +270,21 @@ else
             });
 
             document.addEventListener("DOMContentLoaded", function () {
-                // Y ekseni sabit: nem 0-100, sicaklik en az 0-25 (deger tasarsa eksen genisler)
-                const baseOptions = { responsive: true, maintainAspectRatio: false };
-                const humOptions = { ...baseOptions, scales: { y: { min: 0, max: 100 } } };
-                const tempOptions = { ...baseOptions, scales: { y: { min: 0, suggestedMax: 25 } } };
+                // Layout'taki Chart.js v2.9.3 sozdizimi: Y ekseni sabit (nem 0-100, sicaklik en az 0-25; deger tasarsa genisler)
+                const baseOptions = {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    elements: { point: { radius: 0, hitRadius: 6 } },
+                    scales: { xAxes: [{ ticks: { maxTicksLimit: 12, maxRotation: 0 } }] }
+                };
+                const humOptions = {
+                    ...baseOptions,
+                    scales: { ...baseOptions.scales, yAxes: [{ ticks: { min: 0, max: 100 } }] }
+                };
+                const tempOptions = {
+                    ...baseOptions,
+                    scales: { ...baseOptions.scales, yAxes: [{ ticks: { min: 0, suggestedMax: 25 } }] }
+                };
 
                 tempChart = new Chart(document.getElementById('tempChart'), {
                     type: 'line',
