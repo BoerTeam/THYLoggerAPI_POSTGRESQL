@@ -41,6 +41,7 @@ builder.Services.AddScoped<GpsService>();
 builder.Services.AddScoped<NemService>();
 builder.Services.AddScoped<SicaklikService>();
 builder.Services.AddScoped<LatestService>();
+builder.Services.AddScoped<AuditLogService>();
 
 // PostgreSQL Baðlantýsý
 builder.Services.AddDbContext<ApplicationDbContext>((sp, options) =>
@@ -131,6 +132,15 @@ using (var scope = app.Services.CreateScope())
             );
             context.SaveChanges();
             Console.WriteLine("--> Temel sayfa (Pages) verileri eklendi.");
+        }
+
+        // 6. Denetim Kayýtlarý menü sayfasý (var olan kurulumlarda da eklenir; yalnýzca Admin görür)
+        if (!context.Pages.Any(p => p.Route == "/AuditLog/Index"))
+        {
+            var nextOrder = context.Pages.Any() ? context.Pages.Max(p => p.Order) + 1 : 1;
+            context.Pages.Add(new Page { Name = "Denetim Kayýtlarý", Route = "/AuditLog/Index", PermissionCode = "AdminOnly", Icon = "shield", Order = nextOrder });
+            context.SaveChanges();
+            Console.WriteLine("--> Denetim Kayýtlarý menü sayfasý eklendi.");
         }
 
         Console.WriteLine("--> Veritabaný, migrasyonlar ve varsayýlan veriler baþarýyla kontrol edildi.");

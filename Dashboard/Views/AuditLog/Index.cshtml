@@ -1,0 +1,185 @@
+@model Dashboard.DTO.AuditLogIndexViewModel
+@using System.Text.Json
+
+@{
+    ViewData["Title"] = "Denetim Kayıtları";
+    var f = Model.Filter;
+    var tr = TimeZoneInfo.FindSystemTimeZoneById("Turkey Standard Time");
+    var totalPages = Math.Max(1, (int)Math.Ceiling(Model.Result.Total / (double)f.PageSize));
+
+    string PageUrl(int p) => Url.Action("Index", "AuditLog", new
+    {
+        entityName = f.EntityName,
+        action = f.Action,
+        userId = f.UserId,
+        primaryKey = f.PrimaryKey,
+        search = f.Search,
+        start = f.Start?.ToString("yyyy-MM-ddTHH:mm"),
+        end = f.End?.ToString("yyyy-MM-ddTHH:mm"),
+        pageSize = f.PageSize,
+        page = p
+    })!;
+
+    string Pretty(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return "";
+        try
+        {
+            return JsonSerializer.Serialize(JsonDocument.Parse(json).RootElement,
+                new JsonSerializerOptions { WriteIndented = true, Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping });
+        }
+        catch { return json; }
+    }
+
+    string BadgeClass(string action) => action switch
+    {
+        "Added" => "bg-success",
+        "Modified" => "bg-warning text-dark",
+        "Deleted" => "bg-danger",
+        _ => "bg-secondary"
+    };
+}
+
+<link rel="stylesheet" href="~/app-assets/vendors/css/pickers/flatpickr/flatpickr.min.css" />
+
+<div class="container-fluid mt-4">
+    <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0 text-white">Denetim Kayıtları (Audit Log)</h5>
+            <span class="badge bg-light text-dark">Toplam: @Model.Result.Total</span>
+        </div>
+        <div class="card-body">
+            @if (Model.ApiError)
+            {
+                <div class="alert alert-danger">Denetim kayıtları API'den alınamadı.</div>
+            }
+
+            <form method="get" asp-action="Index" asp-controller="AuditLog" class="row g-2 mb-3 align-items-end">
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold mb-0">Varlık</label>
+                    <select name="entityName" class="form-select form-select-sm">
+                        <option value="">Tümü</option>
+                        @foreach (var e in Model.Options.Entities)
+                        {
+                            <option value="@e" selected="@(e == f.EntityName)">@e</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold mb-0">İşlem</label>
+                    <select name="action" class="form-select form-select-sm">
+                        <option value="">Tümü</option>
+                        @foreach (var a in Model.Options.Actions)
+                        {
+                            <option value="@a" selected="@(a == f.Action)">@a</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold mb-0">Başlangıç</label>
+                    <input type="text" name="start" class="form-control form-control-sm audit-datetime" value="@f.Start?.ToString("yyyy-MM-ddTHH:mm")" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold mb-0">Bitiş</label>
+                    <input type="text" name="end" class="form-control form-control-sm audit-datetime" value="@f.End?.ToString("yyyy-MM-ddTHH:mm")" />
+                </div>
+                <div class="col-md-1">
+                    <label class="form-label small fw-bold mb-0">Kayıt No</label>
+                    <input type="text" name="primaryKey" class="form-control form-control-sm" value="@f.PrimaryKey" />
+                </div>
+                <div class="col-md-1">
+                    <label class="form-label small fw-bold mb-0">Kullanıcı</label>
+                    <input type="text" name="userId" class="form-control form-control-sm" value="@f.UserId" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold mb-0">Değerlerde ara</label>
+                    <input type="text" name="search" class="form-control form-control-sm" value="@f.Search" placeholder="örn. DollyId" />
+                </div>
+                <div class="col-md-1">
+                    <label class="form-label small fw-bold mb-0">Satır</label>
+                    <select name="pageSize" class="form-select form-select-sm">
+                        @foreach (var s in new[] { 25, 50, 100, 200 })
+                        {
+                            <option value="@s" selected="@(s == f.PageSize)">@s</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-auto">
+                    <button type="submit" class="btn btn-primary btn-sm">Filtrele</button>
+                    <a asp-action="Index" asp-controller="AuditLog" class="btn btn-outline-secondary btn-sm">Temizle</a>
+                </div>
+            </form>
+
+            <div class="table-responsive">
+                <table class="table table-hover table-bordered align-middle table-sm">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width:150px">Tarih (TR)</th>
+                            <th>Kullanıcı</th>
+                            <th>Varlık</th>
+                            <th>İşlem</th>
+                            <th>Kayıt No</th>
+                            <th>Detay</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in Model.Result.Items)
+                        {
+                            var local = TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(item.CreatedAtUtc, DateTimeKind.Utc), tr);
+                            <tr>
+                                <td class="text-nowrap">@local.ToString("dd.MM.yyyy HH:mm:ss")</td>
+                                <td>@(string.IsNullOrEmpty(item.UserId) ? "-" : item.UserId)</td>
+                                <td>@item.EntityName</td>
+                                <td><span class="badge @BadgeClass(item.Action)">@item.Action</span></td>
+                                <td>@item.PrimaryKey</td>
+                                <td>
+                                    @if (!string.IsNullOrEmpty(item.OldValues) || !string.IsNullOrEmpty(item.NewValues))
+                                    {
+                                        <details>
+                                            <summary class="small text-primary" style="cursor:pointer">Değerleri göster</summary>
+                                            <div class="row mt-1">
+                                                @if (!string.IsNullOrEmpty(item.OldValues))
+                                                {
+                                                    <div class="col-md-6"><div class="small fw-bold">Eski</div><pre class="small mb-0">@Pretty(item.OldValues)</pre></div>
+                                                }
+                                                @if (!string.IsNullOrEmpty(item.NewValues))
+                                                {
+                                                    <div class="col-md-6"><div class="small fw-bold">Yeni</div><pre class="small mb-0">@Pretty(item.NewValues)</pre></div>
+                                                }
+                                            </div>
+                                        </details>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                        @if (!Model.Result.Items.Any())
+                        {
+                            <tr><td colspan="6" class="text-center text-muted">Kayıt bulunamadı.</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <nav class="d-flex justify-content-between align-items-center">
+                <span class="small text-muted">Sayfa @f.Page / @totalPages</span>
+                <ul class="pagination pagination-sm mb-0">
+                    <li class="page-item @(f.Page <= 1 ? "disabled" : "")"><a class="page-link" href="@PageUrl(f.Page - 1)">Önceki</a></li>
+                    <li class="page-item @(f.Page >= totalPages ? "disabled" : "")"><a class="page-link" href="@PageUrl(f.Page + 1)">Sonraki</a></li>
+                </ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            // Tarihler gün/ay/yıl gösterilir, sunucuya ISO gider
+            flatpickr('.audit-datetime', {
+                enableTime: true, time_24hr: true, altInput: true, altFormat: 'd/m/Y H:i',
+                dateFormat: 'Y-m-d\\TH:i', locale: { firstDayOfWeek: 1 }, static: true,
+                allowInput: false
+            });
+        });
+    </script>
+}
