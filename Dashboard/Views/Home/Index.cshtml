@@ -170,6 +170,24 @@ else
             const toIso = d => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}:00`;
             let chartStartPicker, chartEndPicker;
 
+            // Saat secimi olan flatpickr takvimi kendiliginden kapanmaz; "Tamam" butonu ve disina tiklayinca kapanma ekler
+            function wirePickerClosing(pickers) {
+                const list = [].concat(pickers);
+                list.forEach(fp => {
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'btn btn-primary btn-sm w-100 mt-1';
+                    btn.textContent = 'Tamam';
+                    btn.addEventListener('click', () => fp.close());
+                    fp.calendarContainer.appendChild(btn);
+                });
+                document.addEventListener('mousedown', e => {
+                    list.forEach(fp => {
+                        if (fp.isOpen && !fp.calendarContainer.contains(e.target) && !fp.altInput.contains(e.target)) fp.close();
+                    });
+                }, true);
+            }
+
             let currentRange = { hours: 24 };
 
             async function loadCharts(range) {
@@ -227,6 +245,7 @@ else
                 };
                 chartStartPicker = flatpickr('#chartStart', chartPickerOpts);
                 chartEndPicker = flatpickr('#chartEnd', chartPickerOpts);
+                wirePickerClosing([chartStartPicker, chartEndPicker]);
                 document.querySelectorAll('.chart-range-btn').forEach(btn =>
                     btn.addEventListener('click', () => loadCharts({ hours: parseInt(btn.dataset.hours) })));
                 document.getElementById('chartApplyBtn').addEventListener('click', () => {
@@ -238,7 +257,7 @@ else
 
             document.addEventListener("DOMContentLoaded", function () {
                 // Tarih gösterimi Gün/Ay/Yıl (gönderilen değer ISO kalır)
-                flatpickr('.excel-datetime', {
+                const excelPickers = flatpickr('.excel-datetime', {
                     enableTime: true,
                     time_24hr: true,
                     altInput: true,
@@ -247,6 +266,7 @@ else
                     locale: { firstDayOfWeek: 1 },
                     appendTo: document.getElementById('xlargeModal')
                 });
+                wirePickerClosing(excelPickers);
             });
 
             document.addEventListener("DOMContentLoaded", function () {
