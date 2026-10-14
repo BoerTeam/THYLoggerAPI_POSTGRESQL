@@ -15,14 +15,16 @@ namespace THYLoggerAPI_POSTGRESQL.Services
             _logger = logger;
         }
 
-        public async Task<List<Gpsdatum>> GetAllAsync()
+        public async Task<List<Gpsdatum>> GetAllAsync(int? dollyId = null, DateTime? start = null, DateTime? end = null)
         {
             _logger.LogInformation("Tüm GPS verileri listeleniyor.");
 
-            return await _context.Gpsdatum
-                .AsNoTracking()
-                .OrderBy(i => i.Id)
-                .ToListAsync();
+            var query = _context.Gpsdatum.AsNoTracking().AsQueryable();
+            if (dollyId.HasValue) query = query.Where(x => x.DollyId == dollyId.Value);
+            if (start.HasValue) query = query.Where(x => x.Time >= start.Value);
+            if (end.HasValue) query = query.Where(x => x.Time <= end.Value);
+
+            return await query.OrderBy(i => i.Id).ToListAsync();
         }
 
         public async Task<(bool IsSuccess, bool IsNotFound, string? ErrorMessage, object? ResponseData)> AddAsync(Gpsdatum entity)

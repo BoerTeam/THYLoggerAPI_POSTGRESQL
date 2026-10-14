@@ -18,11 +18,11 @@ namespace THYLoggerAPI_POSTGRESQL.Controllers
         // GET: api/Sicaklik
         [HttpGet]
         [HttpGet("GetAll")]
-        public async Task<IActionResult> GetAll()
+        public async Task<IActionResult> GetAll([FromQuery] int? dollyId, [FromQuery] DateTime? start, [FromQuery] DateTime? end)
         {
             try
             {
-                var list = await _sicaklikService.GetAllAsync();
+                var list = await _sicaklikService.GetAllAsync(dollyId, start, end);
                 return Ok(list);
             }
             catch (Exception ex)

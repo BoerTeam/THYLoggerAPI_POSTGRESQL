@@ -21,14 +21,16 @@ namespace THYLoggerAPI_POSTGRESQL.Services
             _calibrationOptions = calibrationOptions.Value; // appsettings.json verileri
         }
 
-        public async Task<List<Sicaklik>> GetAllAsync()
+        public async Task<List<Sicaklik>> GetAllAsync(int? dollyId = null, DateTime? start = null, DateTime? end = null)
         {
             _logger.LogInformation("Tüm Sicaklik verileri listeleniyor.");
 
-            return await _context.Sicaklik
-                .AsNoTracking()
-                .OrderBy(i => i.Id)
-                .ToListAsync();
+            var query = _context.Sicaklik.AsNoTracking().AsQueryable();
+            if (dollyId.HasValue) query = query.Where(x => x.DollyId == dollyId.Value);
+            if (start.HasValue) query = query.Where(x => x.Time >= start.Value);
+            if (end.HasValue) query = query.Where(x => x.Time <= end.Value);
+
+            return await query.OrderBy(i => i.Id).ToListAsync();
         }
 
         public async Task<(bool IsSuccess, bool IsNotFound, string? ErrorMessage, object? ResponseData)> AddAsync(Sicaklik entity)

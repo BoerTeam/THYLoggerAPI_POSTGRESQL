@@ -67,9 +67,17 @@ namespace Dashboard.Controllers
             DateTime filterStart = startDate;
             DateTime filterEnd = endDate;
 
-            var tumSicakliklar = await _apiService.GetAsync<List<Sicaklik>>("api/Sicaklik/GetAll") ?? new List<Sicaklik>();
-            var tumNemler = await _apiService.GetAsync<List<Nem>>("api/Nem/GetAll") ?? new List<Nem>();
-            var tumGpsler = await _apiService.GetAsync<List<Gpsdatum>>("api/Gps/GetAll") ?? new List<Gpsdatum>();
+            // Tarih/dolly filtresi API tarafinda uygulanir (uzun araliklarda tum tabloyu cekmemek icin)
+            var rangeParams = new Dictionary<string, string>
+            {
+                { "start", filterStart.ToString("yyyy-MM-ddTHH:mm:ss") },
+                { "end", filterEnd.ToString("yyyy-MM-ddTHH:mm:ss") }
+            };
+            if (dollyId.HasValue) rangeParams.Add("dollyId", dollyId.Value.ToString());
+
+            var tumSicakliklar = await _apiService.GetAsync<List<Sicaklik>>("api/Sicaklik/GetAll", rangeParams) ?? new List<Sicaklik>();
+            var tumNemler = await _apiService.GetAsync<List<Nem>>("api/Nem/GetAll", rangeParams) ?? new List<Nem>();
+            var tumGpsler = await _apiService.GetAsync<List<Gpsdatum>>("api/Gps/GetAll", rangeParams) ?? new List<Gpsdatum>();
             var tumDollyler = await _apiService.GetAsync<List<Dolly>>("api/Dolly/GetAll") ?? new List<Dolly>();
 
             var dollyDict = tumDollyler.ToDictionary(x => x.Id, x => x.Name);
