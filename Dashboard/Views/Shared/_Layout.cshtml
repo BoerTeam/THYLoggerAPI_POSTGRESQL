@@ -142,6 +142,10 @@
     <script>
             $(window).on('load', function() {
                 if (typeof feather !== 'undefined') {
+                    // Menu ikon adi (veritabanindan gelir) feather'da yoksa tum ikonlar bozulmasin
+                    document.querySelectorAll('[data-feather]').forEach(function (el) {
+                        if (!feather.icons[el.getAttribute('data-feather')]) el.setAttribute('data-feather', 'circle');
+                    });
                     feather.replace({
                         width: 14,
                         height: 14

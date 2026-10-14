@@ -21,7 +21,19 @@ namespace THYLoggerAPI_POSTGRESQL.Services
             page = Math.Max(1, page);
             pageSize = Math.Clamp(pageSize, 1, MaxPageSize);
 
-            var query = _context.AuditLogs.AsNoTracking().AsQueryable();
+            IQueryable<THYLoggerAPI_POSTGRESQL.Model.AuditLog> query;
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                // OldValues/NewValues jsonb: ILIKE icin text'e cevrilmeli; LIKE joker karakterleri kacirilir
+                var pattern = "%" + search.Trim().Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_") + "%";
+                query = _context.AuditLogs
+                    .FromSqlInterpolated($"SELECT * FROM \"AuditLogs\" WHERE \"OldValues\"::text ILIKE {pattern} OR \"NewValues\"::text ILIKE {pattern}")
+                    .AsNoTracking();
+            }
+            else
+            {
+                query = _context.AuditLogs.AsNoTracking();
+            }
 
             if (!string.IsNullOrWhiteSpace(entityName)) query = query.Where(x => x.EntityName == entityName);
             if (!string.IsNullOrWhiteSpace(action)) query = query.Where(x => x.Action == action);
@@ -29,13 +41,6 @@ namespace THYLoggerAPI_POSTGRESQL.Services
             if (!string.IsNullOrWhiteSpace(primaryKey)) query = query.Where(x => x.PrimaryKey == primaryKey);
             if (startUtc.HasValue) query = query.Where(x => x.CreatedAtUtc >= startUtc.Value);
             if (endUtc.HasValue) query = query.Where(x => x.CreatedAtUtc <= endUtc.Value);
-            if (!string.IsNullOrWhiteSpace(search))
-            {
-                var pattern = $"%{search.Trim()}%";
-                query = query.Where(x =>
-                    (x.OldValues != null && EF.Functions.ILike(x.OldValues, pattern)) ||
-                    (x.NewValues != null && EF.Functions.ILike(x.NewValues, pattern)));
-            }
 
             var total = await query.CountAsync();
             var items = await query
