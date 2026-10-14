@@ -106,6 +106,20 @@ else
                             </div>
                         </div>
 
+                        <!-- Grafik zaman araligi secimi -->
+                        <div class="d-flex flex-wrap align-items-center gap-2 mb-2" id="chartRangeBar">
+                            <span class="small fw-bold">Grafik Aralığı:</span>
+                            <div class="btn-group btn-group-sm" role="group">
+                                <button type="button" class="btn btn-outline-primary chart-range-btn" data-hours="1">Son 1 Saat</button>
+                                <button type="button" class="btn btn-outline-primary chart-range-btn" data-hours="6">Son 6 Saat</button>
+                                <button type="button" class="btn btn-outline-primary chart-range-btn active" data-hours="24">Son 24 Saat</button>
+                            </div>
+                            <input type="text" id="chartStart" class="form-control form-control-sm" style="width:160px" placeholder="Başlangıç" />
+                            <input type="text" id="chartEnd" class="form-control form-control-sm" style="width:160px" placeholder="Bitiş" />
+                            <button type="button" class="btn btn-primary btn-sm" id="chartApplyBtn">Uygula</button>
+                            <span class="small text-muted" id="chartInfo"></span>
+                        </div>
+
                         <!-- Grafikler ve Harita -->
                         <div class="row">
                             <div class="col-md-4">
@@ -143,16 +157,75 @@ else
     @section Scripts {
         <link rel="stylesheet" href="~/app-assets/vendors/css/pickers/flatpickr/flatpickr.min.css" />
         <script>
-            const allTemps = @Html.Raw(JsonConvert.SerializeObject(Model.Sicaklik)) || [];
-            const allHumidities = @Html.Raw(JsonConvert.SerializeObject(Model.nem)) || [];
 
             let map, marker, tempChart, humChart;
+
+            // --- Grafik verisini secilen aralik icin sunucudan getir ---
+            const pad2 = n => n.toString().padStart(2, '0');
+            const toIso = d => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}:00`;
+            let chartStartPicker, chartEndPicker;
+
+            async function loadCharts(range) {
+                const id = parseInt(document.getElementById('xlargeModal').getAttribute('data-current-id'));
+                let start, end;
+                if (range.hours) {
+                    end = new Date();
+                    start = new Date(end.getTime() - range.hours * 3600000);
+                    chartStartPicker?.setDate(start, false);
+                    chartEndPicker?.setDate(end, false);
+                } else {
+                    start = range.start; end = range.end;
+                }
+                document.querySelectorAll('.chart-range-btn').forEach(b =>
+                    b.classList.toggle('active', !!range.hours && parseInt(b.dataset.hours) === range.hours));
+
+                const info = document.getElementById('chartInfo');
+                info.textContent = 'Yükleniyor...';
+                try {
+                    const res = await fetch(`/Home/GetChartData?id=${id}&start=${encodeURIComponent(toIso(start))}&end=${encodeURIComponent(toIso(end))}`);
+                    const data = await res.json();
+                    if (data.error) { info.textContent = data.error; return; }
+
+                    const longRange = (end - start) > 24 * 3600000;
+                    const label = t => {
+                        const d = new Date(t);
+                        const hm = `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+                        return longRange ? `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)} ${hm}` : hm;
+                    };
+                    tempChart.data.labels = data.temps.map(x => label(x.t));
+                    tempChart.data.datasets[0].data = data.temps.map(x => x.v);
+                    tempChart.update();
+                    humChart.data.labels = data.hums.map(x => label(x.t));
+                    humChart.data.datasets[0].data = data.hums.map(x => x.v);
+                    humChart.update();
+                    info.textContent = data.temps.length + ' sıcaklık, ' + data.hums.length + ' nem kaydı';
+                } catch (e) {
+                    info.textContent = 'Veri alınamadı';
+                }
+            }
 
             delete L.Icon.Default.prototype._getIconUrl;
             L.Icon.Default.mergeOptions({
                 iconRetinaUrl: '/lib/leaflet/images/marker-icon-2x.png',
                 iconUrl: '/lib/leaflet/images/marker-icon.png',
                 shadowUrl: '/lib/leaflet/images/marker-shadow.png',
+            });
+
+            document.addEventListener("DOMContentLoaded", function () {
+                const chartPickerOpts = {
+                    enableTime: true, time_24hr: true, altInput: true, altFormat: 'd/m/Y H:i',
+                    dateFormat: 'Y-m-d\\TH:i', locale: { firstDayOfWeek: 1 },
+                    appendTo: document.getElementById('xlargeModal')
+                };
+                chartStartPicker = flatpickr('#chartStart', chartPickerOpts);
+                chartEndPicker = flatpickr('#chartEnd', chartPickerOpts);
+                document.querySelectorAll('.chart-range-btn').forEach(btn =>
+                    btn.addEventListener('click', () => loadCharts({ hours: parseInt(btn.dataset.hours) })));
+                document.getElementById('chartApplyBtn').addEventListener('click', () => {
+                    const s = chartStartPicker.selectedDates[0], e = chartEndPicker.selectedDates[0];
+                    if (!s || !e || s >= e) { document.getElementById('chartInfo').textContent = 'Geçerli bir aralık seçin'; return; }
+                    loadCharts({ start: s, end: e });
+                });
             });
 
             document.addEventListener("DOMContentLoaded", function () {
@@ -215,24 +288,7 @@ else
                 modalEl.addEventListener('shown.bs.modal', function () {
                     const id = parseInt(this.getAttribute('data-current-id'));
 
-                    const fTemps = allTemps.filter(x => (x.DollyId || x.dollyId) === id).slice(-15);
-                    const fHums = allHumidities.filter(x => (x.DollyId || x.dollyId) === id).slice(-15);
-
-                    tempChart.data.labels = fTemps.map(x => {
-                        const d = new Date(x.Time || x.time);
-                        if (isNaN(d)) return "";
-                        return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
-                    });
-                    tempChart.data.datasets[0].data = fTemps.map(x => x.Sicaklik1 ?? x.sicaklik1);
-                    tempChart.update();
-
-                    humChart.data.labels = fHums.map(x => {
-                        const d = new Date(x.Time || x.time);
-                        if (isNaN(d)) return "";
-                        return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
-                    });
-                    humChart.data.datasets[0].data = fHums.map(x => x.Nem1 ?? x.nem1);
-                    humChart.update();
+                    loadCharts({ hours: 24 });
 
                     setTimeout(() => {
                         let rawLat = modalEl.getAttribute('data-current-lat');

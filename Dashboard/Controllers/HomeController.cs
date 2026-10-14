@@ -213,6 +213,34 @@ namespace Dashboard.Controllers
         }
 
         [HttpGet]
+        public async Task<IActionResult> GetChartData(int id, DateTime start, DateTime end)
+        {
+            if (!User.HasClaim("Permission", "DOLLY_VIEW") && !User.IsInRole("Admin"))
+            {
+                return Json(new { error = "Yetkisiz erisim" });
+            }
+
+            var rangeParams = new Dictionary<string, string>
+            {
+                { "dollyId", id.ToString() },
+                { "start", start.ToString("yyyy-MM-ddTHH:mm:ss") },
+                { "end", end.ToString("yyyy-MM-ddTHH:mm:ss") }
+            };
+
+            var tempTask = _apiService.GetAsync<List<Sicaklik>>("api/Sicaklik/GetAll", rangeParams);
+            var humTask = _apiService.GetAsync<List<Nem>>("api/Nem/GetAll", rangeParams);
+            await Task.WhenAll(tempTask, humTask);
+
+            return Json(new
+            {
+                temps = (tempTask.Result ?? new List<Sicaklik>()).Where(x => x.Time.HasValue).OrderBy(x => x.Time)
+                    .Select(x => new { t = x.Time!.Value.ToString("yyyy-MM-ddTHH:mm:ss"), v = x.Sicaklik1 }),
+                hums = (humTask.Result ?? new List<Nem>()).Where(x => x.Time.HasValue).OrderBy(x => x.Time)
+                    .Select(x => new { t = x.Time!.Value.ToString("yyyy-MM-ddTHH:mm:ss"), v = x.Nem1 })
+            });
+        }
+
+        [HttpGet]
         public async Task<IActionResult> GetHistoryData(int id, DateTime? start, DateTime? end)
         {
             if (!User.HasClaim("Permission", "DOLLY_VIEW") && !User.IsInRole("Admin"))
