@@ -15,14 +15,16 @@ namespace THYLoggerAPI_POSTGRESQL.Services
             _logger = logger;
         }
 
-        public async Task<List<BosDolu>> GetAllAsync()
+        public async Task<List<BosDolu>> GetAllAsync(int? dollyId = null, DateTime? start = null, DateTime? end = null)
         {
             _logger.LogInformation("Tüm BosDolu verileri listeleniyor.");
 
-            return await _context.BosDolu
-                .AsNoTracking()
-                .OrderBy(i => i.Id)
-                .ToListAsync();
+            var query = _context.BosDolu.AsNoTracking().AsQueryable();
+            if (dollyId.HasValue) query = query.Where(x => x.DollyId == dollyId.Value);
+            if (start.HasValue) query = query.Where(x => x.Time >= start.Value);
+            if (end.HasValue) query = query.Where(x => x.Time <= end.Value);
+
+            return await query.OrderBy(i => i.Id).ToListAsync();
         }
 
         public async Task<(bool IsSuccess, bool IsNotFound, string? ErrorMessage, object? ResponseData)> AddAsync(BosDolu entity)

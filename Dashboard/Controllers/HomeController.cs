@@ -78,6 +78,7 @@ namespace Dashboard.Controllers
             var tumSicakliklar = await _apiService.GetAsync<List<Sicaklik>>("api/Sicaklik/GetAll", rangeParams) ?? new List<Sicaklik>();
             var tumNemler = await _apiService.GetAsync<List<Nem>>("api/Nem/GetAll", rangeParams) ?? new List<Nem>();
             var tumGpsler = await _apiService.GetAsync<List<Gpsdatum>>("api/Gps/GetAll", rangeParams) ?? new List<Gpsdatum>();
+            var tumDurumlar = await _apiService.GetAsync<List<BosDolu>>("api/DoluBos/GetAll", rangeParams) ?? new List<BosDolu>();
             var tumDollyler = await _apiService.GetAsync<List<Dolly>>("api/Dolly/GetAll") ?? new List<Dolly>();
 
             var dollyDict = tumDollyler.ToDictionary(x => x.Id, x => x.Name);
@@ -173,6 +174,62 @@ namespace Dashboard.Controllers
                     row++;
                 }
                 wsGps.Columns().AdjustToContents();
+
+                // 4. Bos/Dolu Durum Sayfasi: durum degisimlerine gore aralik bazli ozet
+                var wsState = workbook.Worksheets.Add("Boþ-Dolu Durumu");
+                string[] stateHeaders = { "Dolly Adý", "Baþlangýç", "Bitiþ", "Durum",
+                    "Min Sýcaklýk (°C)", "Ort Sýcaklýk (°C)", "Maks Sýcaklýk (°C)",
+                    "Min Nem (%)", "Ort Nem (%)", "Maks Nem (%)",
+                    "Baþlangýç Enlem", "Baþlangýç Boylam", "Bitiþ Enlem", "Bitiþ Boylam" };
+                for (int c = 0; c < stateHeaders.Length; c++) wsState.Cell(1, c + 1).Value = stateHeaders[c];
+
+                row = 2;
+                foreach (var dollyGroup in tumDurumlar.Where(x => x.Time.HasValue && x.SensorDegeri.HasValue)
+                                                      .GroupBy(x => x.DollyId))
+                {
+                    var changes = new List<(DateTime Start, bool Full)>();
+                    foreach (var d in dollyGroup.OrderBy(x => x.Time))
+                    {
+                        if (changes.Count == 0 || changes[^1].Full != d.SensorDegeri!.Value)
+                            changes.Add((d.Time!.Value, d.SensorDegeri!.Value));
+                    }
+
+                    for (int i = 0; i < changes.Count; i++)
+                    {
+                        var pStart = changes[i].Start;
+                        var pEnd = i + 1 < changes.Count ? changes[i + 1].Start : filterEnd;
+
+                        var temps = filteredSicaklik.Where(x => x.DollyId == dollyGroup.Key && x.Time >= pStart && x.Time < pEnd && x.Sicaklik1.HasValue).Select(x => (double)x.Sicaklik1!.Value).ToList();
+                        var hums = filteredNem.Where(x => x.DollyId == dollyGroup.Key && x.Time >= pStart && x.Time < pEnd && x.Nem1.HasValue).Select(x => (double)x.Nem1!.Value).ToList();
+                        var gps = filteredGps.Where(x => x.DollyId == dollyGroup.Key && x.Time >= pStart && x.Time < pEnd).OrderBy(x => x.Time).ToList();
+
+                        wsState.Cell(row, 1).Value = dollyDict.TryGetValue(dollyGroup.Key, out var dName) ? dName : dollyGroup.Key.ToString();
+                        wsState.Cell(row, 2).Value = pStart.ToString("dd.MM.yyyy HH:mm:ss", trCulture);
+                        wsState.Cell(row, 3).Value = pEnd.ToString("dd.MM.yyyy HH:mm:ss", trCulture);
+                        wsState.Cell(row, 4).Value = changes[i].Full ? "Dolu" : "Boþ";
+                        if (temps.Count > 0)
+                        {
+                            wsState.Cell(row, 5).Value = temps.Min();
+                            wsState.Cell(row, 6).Value = Math.Round(temps.Average(), 2);
+                            wsState.Cell(row, 7).Value = temps.Max();
+                        }
+                        if (hums.Count > 0)
+                        {
+                            wsState.Cell(row, 8).Value = hums.Min();
+                            wsState.Cell(row, 9).Value = Math.Round(hums.Average(), 2);
+                            wsState.Cell(row, 10).Value = hums.Max();
+                        }
+                        if (gps.Count > 0)
+                        {
+                            wsState.Cell(row, 11).Value = gps[0].Latitude;
+                            wsState.Cell(row, 12).Value = gps[0].Longitude;
+                            wsState.Cell(row, 13).Value = gps[^1].Latitude;
+                            wsState.Cell(row, 14).Value = gps[^1].Longitude;
+                        }
+                        row++;
+                    }
+                }
+                wsState.Columns().AdjustToContents();
 
                 using (var stream = new MemoryStream())
                 {

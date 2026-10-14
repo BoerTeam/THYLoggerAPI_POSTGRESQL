@@ -16,11 +16,11 @@ namespace THYLoggerAPI_POSTGRESQL.Controllers
         }
 
         [HttpGet("GetAll")]
-        public async Task<IActionResult> GetAll()
+        public async Task<IActionResult> GetAll([FromQuery] int? dollyId, [FromQuery] DateTime? start, [FromQuery] DateTime? end)
         {
             try
             {
-                var list = await _doluBosService.GetAllAsync();
+                var list = await _doluBosService.GetAllAsync(dollyId, start, end);
                 return Ok(list);
             }
             catch (Exception ex)
