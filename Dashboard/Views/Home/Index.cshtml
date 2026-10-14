@@ -302,6 +302,8 @@ else
             });
 
             setInterval(function () {
+                // Kullanıcı dolly detayını açmışsa sayfayı yenileme (popup kendiliğinden kapanmasın)
+                if (document.querySelector('.modal.show')) return;
                 window.location.reload();
             }, 30000);
         </script>
