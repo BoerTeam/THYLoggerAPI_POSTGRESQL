@@ -67,10 +67,10 @@ namespace Dashboard.Controllers
             DateTime filterStart = startDate;
             DateTime filterEnd = endDate;
 
-            var tumSicakliklar = await _apiService.GetAsync<List<Sicaklik>>("api/Sicaklik") ?? new List<Sicaklik>();
-            var tumNemler = await _apiService.GetAsync<List<Nem>>("api/Nem/Get") ?? new List<Nem>();
-            var tumGpsler = await _apiService.GetAsync<List<Gpsdatum>>("api/Gps/Get") ?? new List<Gpsdatum>();
-            var tumDollyler = await _apiService.GetAsync<List<Dolly>>("api/Dolly/Get") ?? new List<Dolly>();
+            var tumSicakliklar = await _apiService.GetAsync<List<Sicaklik>>("api/Sicaklik/GetAll") ?? new List<Sicaklik>();
+            var tumNemler = await _apiService.GetAsync<List<Nem>>("api/Nem/GetAll") ?? new List<Nem>();
+            var tumGpsler = await _apiService.GetAsync<List<Gpsdatum>>("api/Gps/GetAll") ?? new List<Gpsdatum>();
+            var tumDollyler = await _apiService.GetAsync<List<Dolly>>("api/Dolly/GetAll") ?? new List<Dolly>();
 
             var dollyDict = tumDollyler.ToDictionary(x => x.Id, x => x.Name);
             var trCulture = new System.Globalization.CultureInfo("tr-TR");
@@ -184,10 +184,10 @@ namespace Dashboard.Controllers
                 return Json(new { error = "Yetkisiz eriþim" });
             }
 
-            var sicakliklar = await _apiService.GetAsync<List<Sicaklik>>("api/Sicaklik") ?? new List<Sicaklik>();
-            var nemler = await _apiService.GetAsync<List<Nem>>("api/Nem/Get") ?? new List<Nem>();
-            var gpsler = await _apiService.GetAsync<List<Gpsdatum>>("api/Gps/Get") ?? new List<Gpsdatum>();
-            var durumlar = await _apiService.GetAsync<List<BosDolu>>("api/DoluBos/Get") ?? new List<BosDolu>();
+            var sicakliklar = await _apiService.GetAsync<List<Sicaklik>>("api/Sicaklik/GetAll") ?? new List<Sicaklik>();
+            var nemler = await _apiService.GetAsync<List<Nem>>("api/Nem/GetAll") ?? new List<Nem>();
+            var gpsler = await _apiService.GetAsync<List<Gpsdatum>>("api/Gps/GetAll") ?? new List<Gpsdatum>();
+            var durumlar = await _apiService.GetAsync<List<BosDolu>>("api/DoluBos/GetAll") ?? new List<BosDolu>();
 
             var sonSicaklik = sicakliklar.Where(x => x.DollyId == id).OrderByDescending(x => x.Time).FirstOrDefault();
             var sonNem = nemler.Where(x => x.DollyId == id).OrderByDescending(x => x.Time).FirstOrDefault();

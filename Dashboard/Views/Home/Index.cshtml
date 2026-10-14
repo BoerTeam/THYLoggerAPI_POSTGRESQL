@@ -87,12 +87,12 @@ else
 
                                         <div class="col-auto">
                                             <label class="form-label mb-0 small fw-bold">Başlangıç Tarihi & Saati:</label>
-                                            <input type="datetime-local" name="startDate" class="form-control form-control-sm"
+                                            <input type="text" name="startDate" class="form-control form-control-sm excel-datetime"
                                                    value="@DateTime.Now.AddDays(-7).ToString("yyyy-MM-ddTHH:mm")" required />
                                         </div>
                                         <div class="col-auto">
                                             <label class="form-label mb-0 small fw-bold">Bitiş Tarihi & Saati:</label>
-                                            <input type="datetime-local" name="endDate" class="form-control form-control-sm"
+                                            <input type="text" name="endDate" class="form-control form-control-sm excel-datetime"
                                                    value="@DateTime.Now.ToString("yyyy-MM-ddTHH:mm")" required />
                                         </div>
                                         <div class="col-auto">
@@ -141,6 +141,7 @@ else
     </section>
 
     @section Scripts {
+        <link rel="stylesheet" href="~/app-assets/vendors/css/pickers/flatpickr/flatpickr.min.css" />
         <script>
             const allTemps = @Html.Raw(JsonConvert.SerializeObject(Model.Sicaklik)) || [];
             const allHumidities = @Html.Raw(JsonConvert.SerializeObject(Model.nem)) || [];
@@ -152,6 +153,19 @@ else
                 iconRetinaUrl: '/lib/leaflet/images/marker-icon-2x.png',
                 iconUrl: '/lib/leaflet/images/marker-icon.png',
                 shadowUrl: '/lib/leaflet/images/marker-shadow.png',
+            });
+
+            document.addEventListener("DOMContentLoaded", function () {
+                // Tarih gösterimi Gün/Ay/Yıl (gönderilen değer ISO kalır)
+                flatpickr('.excel-datetime', {
+                    enableTime: true,
+                    time_24hr: true,
+                    altInput: true,
+                    altFormat: 'd/m/Y H:i',
+                    dateFormat: 'Y-m-d\TH:i',
+                    locale: { firstDayOfWeek: 1 },
+                    appendTo: document.getElementById('xlargeModal')
+                });
             });
 
             document.addEventListener("DOMContentLoaded", function () {
