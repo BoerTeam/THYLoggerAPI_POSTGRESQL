@@ -6,7 +6,7 @@
   },
   "name": "thyloggerapi_postgresql",
   "description": "07/07/2026 da sunucu erişimi sağlanınca,\r 10.11.94.155 IP li makineye",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "main": "index.js",
   "devDependencies": {},
   "scripts": {
