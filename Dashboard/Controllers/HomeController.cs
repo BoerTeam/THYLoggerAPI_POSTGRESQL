@@ -36,21 +36,20 @@ namespace Dashboard.Controllers
                 return RedirectToAction("AccessDenied", "Home");
             }
 
-            var nemTask = _apiService.GetAsync<List<Nem>>("api/Nem/GetAll");
-            var sicaklikTask = _apiService.GetAsync<List<Sicaklik>>("api/Sicaklik/GetAll");
-            var dolubosTask = _apiService.GetAsync<List<BosDolu>>("api/DoluBos/GetAll");
+            // Sadece her dolly'nin son kayitlari cekilir (tum tablolar degil)
+            var snapshotTask = _apiService.GetAsync<LatestSnapshot>("api/Latest/GetAll");
             var dollyTask = _apiService.GetAsync<List<Dolly>>("api/Dolly/GetAll");
-            var gpsTask = _apiService.GetAsync<List<Gpsdatum>>("api/Gps/GetAll");
 
-            await Task.WhenAll(nemTask, sicaklikTask, dolubosTask, dollyTask, gpsTask);
+            await Task.WhenAll(snapshotTask, dollyTask);
 
+            var snapshot = await snapshotTask ?? new LatestSnapshot();
             var multiModel = new MultiModel
             {
-                nem = await nemTask ?? new List<Nem>(),
-                Sicaklik = await sicaklikTask ?? new List<Sicaklik>(),
-                bosDolu = await dolubosTask ?? new List<BosDolu>(),
+                nem = snapshot.Nem,
+                Sicaklik = snapshot.Sicaklik,
+                bosDolu = snapshot.BosDolu,
                 DollyList = await dollyTask ?? new List<Dolly>(),
-                gpsdatum = await gpsTask ?? new List<Gpsdatum>()
+                gpsdatum = snapshot.Gps
             };
 
             return View(multiModel);
@@ -267,6 +266,44 @@ namespace Dashboard.Controllers
                 lng = sonGps?.Longitude,
                 isFull = sonDurum?.SensorDegeri ?? false
             });
+        }
+
+        // Dashboard kartlarinin AJAX ile canli guncellenmesi icin her dolly'nin son degerleri
+        [HttpGet]
+        [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
+        public async Task<IActionResult> GetLatestAll()
+        {
+            if (!User.HasClaim("Permission", "DASHBOARD_VIEW") && !User.IsInRole("Admin"))
+            {
+                return Json(new { error = "Yetkisiz erisim" });
+            }
+
+            var snapshot = await _apiService.GetAsync<LatestSnapshot>("api/Latest/GetAll") ?? new LatestSnapshot();
+            var dollyIds = snapshot.Sicaklik.Select(x => x.DollyId)
+                .Union(snapshot.Nem.Select(x => x.DollyId))
+                .Union(snapshot.Gps.Select(x => x.DollyId))
+                .Union(snapshot.BosDolu.Select(x => x.DollyId));
+
+            var result = dollyIds.Select(id =>
+            {
+                var s = snapshot.Sicaklik.FirstOrDefault(x => x.DollyId == id);
+                var n = snapshot.Nem.FirstOrDefault(x => x.DollyId == id);
+                var g = snapshot.Gps.FirstOrDefault(x => x.DollyId == id);
+                var b = snapshot.BosDolu.FirstOrDefault(x => x.DollyId == id);
+                return new
+                {
+                    dollyId = id,
+                    sicaklik = s?.Sicaklik1,
+                    nem = n?.Nem1,
+                    lat = g?.Latitude,
+                    lng = g?.Longitude,
+                    isFull = b?.SensorDegeri ?? false,
+                    updated = s?.Time?.ToString("dd.MM.yyyy HH:mm:ss"),
+                    gpsTime = g?.Time?.ToString("dd.MM.yyyy HH:mm:ss")
+                };
+            }).ToList();
+
+            return Json(result);
         }
 
         [HttpGet]

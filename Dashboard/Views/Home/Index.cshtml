@@ -39,18 +39,19 @@ else
                          data-lng="@lngVal"
                          data-status="@(sonDurum?.SensorDegeri == true ? "true" : "false")">
 
-                        <div class="card-body" style="background-color: @(sicaklikDegeri <= 25 ? "#28c76f" : "#ea5455"); border-radius: 8px; padding: 1rem;">
+                        <div class="card-body" data-field="body" style="background-color: @(sicaklikDegeri <= 25 ? "#28c76f" : "#ea5455"); border-radius: 8px; padding: 1rem;">
                             <h5 class="fw-bolder text-white">@dolly.Name</h5>
                             <div class="row text-white">
                                 <div class="col-md-6">
                                     <small>Sıcaklık</small>
-                                    <h6 class="fw-bold">@(sonSicaklik?.Sicaklik1?.ToString("0.0") ?? "0")°C</h6>
+                                    <h6 class="fw-bold" data-field="temp">@(sonSicaklik?.Sicaklik1?.ToString("0.0") ?? "0")°C</h6>
                                 </div>
                                 <div class="col-md-6">
                                     <small>Nem</small>
-                                    <h6 class="fw-bold">%@(sonNem?.Nem1?.ToString("0") ?? "0")</h6>
+                                    <h6 class="fw-bold" data-field="nem">%@(sonNem?.Nem1?.ToString("0") ?? "0")</h6>
                                 </div>
                             </div>
+                            <small class="d-block text-white mt-1" style="opacity:.8" data-field="updated">@(sonSicaklik?.Time?.ToString("dd.MM.yyyy HH:mm:ss") ?? "-")</small>
                         </div>
                     </div>
                 </div>
@@ -169,7 +170,10 @@ else
             const toIso = d => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}:00`;
             let chartStartPicker, chartEndPicker;
 
+            let currentRange = { hours: 24 };
+
             async function loadCharts(range) {
+                currentRange = range.hours ? { hours: range.hours } : null;
                 const id = parseInt(document.getElementById('xlargeModal').getAttribute('data-current-id'));
                 let start, end;
                 if (range.hours) {
@@ -372,10 +376,55 @@ else
                 });
             });
 
+            // --- Canli guncelleme (sayfa yenilemeden) ---
+            async function refreshCards() {
+                try {
+                    const res = await fetch('/Home/GetLatestAll', { cache: 'no-store' });
+                    if (!res.ok) return;
+                    const list = await res.json();
+                    if (!Array.isArray(list)) return;
+
+                    const modalEl = document.getElementById('xlargeModal');
+                    const modalOpen = modalEl.classList.contains('show');
+                    const openId = parseInt(modalEl.getAttribute('data-current-id'));
+
+                    list.forEach(d => {
+                        const card = document.querySelector(`.doly-card[data-dolly-id="${d.dollyId}"]`);
+                        if (!card) return;
+
+                        card.setAttribute('data-lat', d.lat ?? '');
+                        card.setAttribute('data-lng', d.lng ?? '');
+                        card.setAttribute('data-status', d.isFull ? 'true' : 'false');
+
+                        const temp = d.sicaklik ?? 0;
+                        card.querySelector('[data-field="body"]').style.backgroundColor = temp <= 25 ? '#28c76f' : '#ea5455';
+                        card.querySelector('[data-field="temp"]').textContent = `${temp.toFixed(1).replace(',', '.')}°C`;
+                        card.querySelector('[data-field="nem"]').textContent = `%${Math.round(d.nem ?? 0)}`;
+                        card.querySelector('[data-field="updated"]').textContent = d.updated ?? '-';
+
+                        // Detay penceresi bu dolly icin aciksa onu da guncelle
+                        if (modalOpen && openId === d.dollyId) {
+                            modalEl.setAttribute('data-current-lat', d.lat ?? '');
+                            modalEl.setAttribute('data-current-lng', d.lng ?? '');
+                            document.getElementById('modalDoluBosCheck').checked = !!d.isFull;
+
+                            if (marker && map && d.lat != null && d.lng != null) {
+                                const ll = L.latLng(d.lat, d.lng);
+                                marker.setLatLng(ll);
+                                marker.setTooltipContent(`<b>${document.getElementById('modalDolyName').innerText}</b><br>${d.lat.toFixed(5)}, ${d.lng.toFixed(5)}`);
+                                marker.setPopupContent(`<b>Konum Koordinatları:</b><br>Lat: ${d.lat}<br>Lng: ${d.lng}`);
+                                if (!map.getBounds().contains(ll)) map.panTo(ll);
+                            }
+                        }
+                    });
+                } catch (e) { /* bir sonraki turda tekrar denenir */ }
+            }
+
+            setInterval(refreshCards, 5000);
+
+            // Detay penceresi aciksa ve hazir aralik seciliyse grafikleri de tazele
             setInterval(function () {
-                // Kullanıcı dolly detayını açmışsa sayfayı yenileme (popup kendiliğinden kapanmasın)
-                if (document.querySelector('.modal.show')) return;
-                window.location.reload();
+                if (document.querySelector('.modal.show') && currentRange) loadCharts(currentRange);
             }, 30000);
         </script>
     }

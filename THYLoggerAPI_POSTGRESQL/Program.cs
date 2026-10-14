@@ -38,6 +38,7 @@ builder.Services.AddScoped<DoluBosService>();
 builder.Services.AddScoped<GpsService>();
 builder.Services.AddScoped<NemService>();
 builder.Services.AddScoped<SicaklikService>();
+builder.Services.AddScoped<LatestService>();
 
 // PostgreSQL Baðlantýsý
 builder.Services.AddDbContext<ApplicationDbContext>((sp, options) =>
