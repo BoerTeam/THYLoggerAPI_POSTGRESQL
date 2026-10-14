@@ -57,6 +57,10 @@ else
             }
         </div>
 
+        <style>
+            .map-location-label { background: rgba(255,255,255,.85); border: 0; box-shadow: none; font-weight: 600; font-size: 11px; padding: 1px 4px; }
+        </style>
+
         <!-- Dolly Detay Modal -->
         <div class="modal fade text-start" id="xlargeModal" tabindex="-1" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered modal-xl">
@@ -331,10 +335,22 @@ else
 
                             marker = L.marker([lat, lng]).addTo(map);
 
+                            // Sabit lokasyonlar (wwwroot/map/locations.json); koordinati bos olanlar atlanir
+                            const currentMap = map;
+                            fetch('/map/locations.json')
+                                .then(r => r.json())
+                                .then(locs => locs.forEach(loc => {
+                                    if (loc.lat == null || loc.lng == null || map !== currentMap) return;
+                                    L.circle([loc.lat, loc.lng], { radius: loc.radius || 100, color: loc.color || '#7367f0', weight: 2, fillOpacity: 0.15 })
+                                        .addTo(currentMap)
+                                        .bindTooltip(loc.name, { permanent: true, direction: 'center', className: 'map-location-label' });
+                                }))
+                                .catch(() => { });
+
                             const popupText = `<b>Konum Koordinatları:</b><br>Lat: ${lat}<br>Lng: ${lng}`;
                             marker.bindPopup(popupText);
 
-                            marker.bindTooltip(`<b>${lat.toFixed(5)}, ${lng.toFixed(5)}</b>`, {
+                            marker.bindTooltip(`<b>${document.getElementById('modalDolyName').innerText}</b><br>${lat.toFixed(5)}, ${lng.toFixed(5)}`, {
                                 permanent: true,
                                 direction: 'top',
                                 offset: [0, -32]

@@ -1,0 +1,7 @@
+[
+  { "name": "SmartIST",       "lat": null, "lng": null, "radius": 150, "color": "#7367f0" },
+  { "name": "Park Pozisyonları", "lat": null, "lng": null, "radius": 200, "color": "#28c76f" },
+  { "name": "CFB",            "lat": null, "lng": null, "radius": 100, "color": "#ff9f43" },
+  { "name": "K-Park",         "lat": null, "lng": null, "radius": 150, "color": "#00cfe8" },
+  { "name": "TGS Atölyesi",   "lat": null, "lng": null, "radius": 100, "color": "#ea5455" }
+]
