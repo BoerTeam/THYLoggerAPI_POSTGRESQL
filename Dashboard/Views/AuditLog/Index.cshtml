@@ -10,7 +10,7 @@
     string PageUrl(int p) => Url.Action("Index", "AuditLog", new
     {
         entityName = f.EntityName,
-        action = f.Action,
+        operation = f.Operation,
         userId = f.UserId,
         primaryKey = f.PrimaryKey,
         search = f.Search,
@@ -67,11 +67,11 @@
                 </div>
                 <div class="col-md-2">
                     <label class="form-label small fw-bold mb-0">İşlem</label>
-                    <select name="action" class="form-select form-select-sm">
+                    <select name="operation" class="form-select form-select-sm">
                         <option value="">Tümü</option>
                         @foreach (var a in Model.Options.Actions)
                         {
-                            <option value="@a" selected="@(a == f.Action)">@a</option>
+                            <option value="@a" selected="@(a == f.Operation)">@a</option>
                         }
                     </select>
                 </div>

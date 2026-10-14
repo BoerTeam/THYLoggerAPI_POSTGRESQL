@@ -30,7 +30,8 @@ namespace Dashboard.DTO
     public class AuditLogFilterViewModel
     {
         public string? EntityName { get; set; }
-        public string? Action { get; set; }
+        // Not: "Action" adi MVC rota degeri (action=Index) ile cakistigi icin Operation kullanilir
+        public string? Operation { get; set; }
         public string? UserId { get; set; }
         public string? PrimaryKey { get; set; }
         public string? Search { get; set; }

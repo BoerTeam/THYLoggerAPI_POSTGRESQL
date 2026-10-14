@@ -36,7 +36,7 @@ namespace Dashboard.Controllers
             };
             void Add(string key, string? value) { if (!string.IsNullOrWhiteSpace(value)) query[key] = value.Trim(); }
             Add("entityName", filter.EntityName);
-            Add("action", filter.Action);
+            Add("action", filter.Operation);
             Add("userId", filter.UserId);
             Add("primaryKey", filter.PrimaryKey);
             Add("search", filter.Search);
