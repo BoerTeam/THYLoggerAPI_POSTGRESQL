@@ -1,7 +1,7 @@
 # Cool Dolly – Kullanıcı Kabul Testi (UAT)
 
 Kaynak: ilk kurulum sonrası müşteri tespitleri (`cool dolly tespit.xlsx`) ve GitHub issue'ları.
-Test edilen sürüm: `master` – commit `07fbf9f` ve sonrası.
+Test edilen sürüm: **v1.0.1**
 
 **Ön koşullar**
 - Test kullanıcısı: `DASHBOARD_VIEW`, `DOLLY_VIEW` ve `EXPORT_EXCEL` yetkili (veya Admin).
