@@ -1,4 +1,6 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using System.Collections.Concurrent;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using THYLoggerAPI_POSTGRESQL.Context;
 using THYLoggerAPI_POSTGRESQL.Model;
 
@@ -8,11 +10,16 @@ namespace THYLoggerAPI_POSTGRESQL.Services
     {
         private readonly ApplicationDbContext _context;
         private readonly ILogger<DoluBosService> _logger;
+        private readonly DoluBosDebounceOptions _debounceOptions;
 
-        public DoluBosService(ApplicationDbContext context, ILogger<DoluBosService> logger)
+        // Dolly basina, mevcut durumdan farkli gelen okumalarin art arda sayisi (servis instance'lari arasi paylasilir)
+        private static readonly ConcurrentDictionary<int, (bool Candidate, int Count)> _pending = new();
+
+        public DoluBosService(ApplicationDbContext context, ILogger<DoluBosService> logger, IOptions<DoluBosDebounceOptions> debounceOptions)
         {
             _context = context;
             _logger = logger;
+            _debounceOptions = debounceOptions.Value;
         }
 
         public async Task<List<BosDolu>> GetAllAsync(int? dollyId = null, DateTime? start = null, DateTime? end = null)
@@ -48,6 +55,42 @@ namespace THYLoggerAPI_POSTGRESQL.Services
 
             // 3. Bulunan cihazın Id'sini BosDolu kaydına ata
             entity.DollyId = dolly.Id;
+
+            // 3.1 Debounce: durum degisimi ancak art arda N okumada dogrulanirsa kaydedilir
+            var required = Math.Max(1, _debounceOptions.RequiredConsecutive);
+            if (required > 1 && entity.SensorDegeri.HasValue)
+            {
+                var incoming = entity.SensorDegeri.Value;
+                var lastState = await _context.BosDolu
+                    .AsNoTracking()
+                    .Where(x => x.DollyId == dolly.Id && x.SensorDegeri != null)
+                    .OrderByDescending(x => x.Time)
+                    .Select(x => x.SensorDegeri)
+                    .FirstOrDefaultAsync();
+
+                if (lastState.HasValue && lastState.Value != incoming)
+                {
+                    var count = _pending.AddOrUpdate(
+                        dolly.Id,
+                        _ => (incoming, 1),
+                        (_, p) => p.Candidate == incoming ? (incoming, p.Count + 1) : (incoming, 1)).Count;
+
+                    if (count < required)
+                    {
+                        _logger.LogInformation("BosDolu degisimi beklemede ({Count}/{Required}). SerialNumber: {SerialNumber}", count, required, entity.SerialNumber);
+                        return (true, false, null, new
+                        {
+                            Message = "DoluBos degisimi dogrulama bekliyor",
+                            Device = dolly.Name,
+                            Status = lastState.Value ? "Dolu" : "Bo\u015f",
+                            Pending = $"{count}/{required}"
+                        });
+                    }
+                }
+
+                // Durum ayni kaldi ya da degisim dogrulandi: bekleyen sayaci sifirla
+                _pending.TryRemove(dolly.Id, out _);
+            }
 
             // 4. Zaman damgası
             // Windows ve Linux (IIS/Docker) uyumlu Türkiye saati alımı:

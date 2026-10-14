@@ -25,6 +25,8 @@ builder.Services.Configure<NemCalibrationOptions>(
     builder.Configuration.GetSection("SensorCalibration:Nem"));
 builder.Services.Configure<SicaklikCalibrationOptions>(
     builder.Configuration.GetSection("SensorCalibration:Sicaklik"));
+builder.Services.Configure<DoluBosDebounceOptions>(
+    builder.Configuration.GetSection("DoluBosDebounce"));
 // Yetkilendirme ve Kimlik Doðrulama Servis Kayýtlarý
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<UserService>();
