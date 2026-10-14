@@ -18,10 +18,10 @@ Test edilen sürüm: **v1.0.1**
 |---|---|---|---|---|---|
 | G-01 | #11 | Ana sayfada bir dolly kartına tıkla. | Detay penceresi açılır; grafikler **son 24 saat** verisini gösterir. "Son 24 Saat" butonu seçili. | | |
 | G-02 | #11 | "Son 1 Saat" ve "Son 6 Saat" butonlarına tıkla. | Grafikler seçilen aralığa göre yenilenir; çubukta kayıt sayısı görünür. | | |
-| G-03 | #11 | Başlangıç ve bitiş tarih-saat seç, **Uygula**'ya tıkla. | Grafikler seçilen aralığı gösterir. 24 saatten uzun aralıkta etiketlerde `gg/aa SS:dd` görünür. | | |
+| G-03 | #11 | Başlangıç ve bitiş alanlarına tıkla; takvimden tarih ve saat seç. Takvimin altındaki **Tamam**'a (veya takvimin dışına) tıkla, sonra **Uygula**'ya tıkla. | Takvim alanın hemen altında açılır, Tamam / dışına tıklayınca kapanır. Grafikler seçilen aralığı gösterir. 24 saatten uzun aralıkta etiketlerde `gg/aa SS:dd` görünür. | | |
 | G-04 | #11 | Bitişi başlangıçtan önce seçip Uygula'ya tıkla. | "Geçerli bir aralık seçin" uyarısı çıkar, grafik bozulmaz. | | |
-| G-05 | #12 | Nem grafiğine bak (değer değişimi olan bir aralıkta). | Y ekseni sabit **0–100**; çizgi gerçek değişimi gösterir. | | |
-| G-06 | #13 | Sıcaklık grafiğine bak. | Y ekseni en az **0–25** görünür; çizgi değişir. Değer 25'i aşarsa eksen genişler. | | |
+| G-05 | #12 | Nem grafiğine bak (değer değişimi olan bir aralıkta). | Y ekseni sabit **0–100** (40–110 gibi kaymaz); çizgi gerçek değişimi gösterir, nokta işaretleri çizgiyi kalınlaştırmaz. | | |
+| G-06 | #13 | Sıcaklık grafiğine bak. | Y ekseni en az **0–25** görünür (4–22 gibi kaymaz); çizgi değişir. Değer 25'i aşarsa eksen genişler. | | |
 
 ## 2. Harita ve konum
 
@@ -51,7 +51,7 @@ Test edilen sürüm: **v1.0.1**
 
 | ID | Issue | Adımlar | Beklenen sonuç | Sonuç | Not |
 |---|---|---|---|---|---|
-| E-01 | #18 | Excel formunda son 1 saatlik aralık seçip indir. | Yalnızca seçilen aralıktaki kayıtlar gelir (ilk/son satır saatlerini kontrol et). | | |
+| E-01 | #18 | Excel formundaki başlangıç/bitiş takvimlerinden son 1 saatlik aralık seç (takvim Tamam ile kapanmalı) ve indir. | Yalnızca seçilen aralıktaki kayıtlar gelir (ilk/son satır saatlerini kontrol et). | | |
 | E-02 | #19 | Aynı Excel'i aç. | **Sıcaklık, Nem ve GPS Konum** sayfalarının üçü de dolu. | | |
 | E-03 | #18 | Başka bir dolly seçip indir. | Yalnızca o dolly'nin kayıtları gelir. | | |
 | E-04 | #20 | Başlangıcı 2 yıl öncesine ayarla (veri varsa) ve indir. | Rapor makul sürede (≤ 1 dk) iner; veri varsa 2 yıl öncesine kadar gelir. Süreyi Not'a yaz. | | |
@@ -71,7 +71,25 @@ Cihazın gönderim aralığı: `______` sn
 | D-03 | #22 | Dolly'yi boşalt ve bekle. | Durum **Boş** olur. | | |
 | D-04 | #22 | D-02 sırasında durum **hiç değişmiyorsa**: cihaz sadece değişimde mi gönderiyor kontrol et. | Evetse `RequiredConsecutive` değerini 1 yapıp sunucuyu yeniden başlat ve testi tekrarla. Sonucu Not'a yaz. | | |
 
-## 7. Sıcaklık doğruluğu
+## 7. Denetim Kayıtları (Audit Log)
+
+Ön koşul: Admin rolüne sahip kullanıcı ve Admin olmayan bir test kullanıcısı.
+
+| ID | Issue | Adımlar | Beklenen sonuç | Sonuç | Not |
+|---|---|---|---|---|---|
+| A-01 | – | Admin ile giriş yap, sol menüye bak. | **Denetim Kayıtları** menü öğesi görünür; tıklayınca sayfa açılır. | | |
+| A-02 | – | Admin olmayan kullanıcı ile giriş yap. | Menüde Denetim Kayıtları görünmez; `/AuditLog/Index` adresi doğrudan açılırsa "Erişim Reddedildi" sayfasına yönlenir. | | |
+| A-03 | – | Sayfayı filtresiz aç. | Kayıtlar en yeniden eskiye listelenir; tarihler Türkiye saatinde `gg.aa.yyyy SS:dd:ss` formatındadır; toplam sayı görünür. | | |
+| A-04 | – | **Varlık** ve **İşlem** listelerinden seçim yapıp Filtrele'ye tıkla. | Yalnızca seçilen varlık/işlem kayıtları gelir (örn. Varlık: Dolly, İşlem: Modified). | | |
+| A-05 | – | Başlangıç ve bitiş tarihi seç (takvim `gg/aa/yyyy`), Filtrele. | Yalnızca seçilen aralıktaki kayıtlar gelir; ilk/son satırın saatini kontrol et. | | |
+| A-06 | – | Bir dolly adını düzenle ve kaydet; ardından Varlık: Dolly, İşlem: Modified filtrele. | Yeni bir kayıt oluşur; **Değerleri göster** ile eski ve yeni değer görünür. | | |
+| A-07 | – | **Değerlerde ara** alanına bir değer (örn. dolly adı) yaz. | Eski/yeni değerlerinde bu metin geçen kayıtlar gelir. | | |
+| A-08 | – | Kayıt No veya Kullanıcı alanı ile filtrele. | Yalnızca eşleşen kayıtlar gelir. *(Kullanıcı sütunu şu an kayıtlarda boş olabilir; bilinen sınırlama.)* | | |
+| A-09 | – | Satır sayısını 25 yapıp Sonraki / Önceki ile gez. | Sayfalama çalışır, uygulanan filtreler sayfa değişince korunur. | | |
+| A-10 | – | Hiç eşleşmeyen bir filtre uygula. | "Kayıt bulunamadı." mesajı görünür, hata oluşmaz. | | |
+| A-11 | – | **Temizle**'ye tıkla. | Filtreler sıfırlanır, tüm kayıtlar listelenir. | | |
+
+## 8. Sıcaklık doğruluğu
 
 | ID | Issue | Adımlar | Beklenen sonuç | Sonuç | Not |
 |---|---|---|---|---|---|
@@ -95,6 +113,7 @@ Cihazın gönderim aralığı: `______` sn
 | Tarih formatı | 2 | | | |
 | Excel | 7 | | | |
 | Boş/Dolu | 4 | | | |
+| Denetim Kayıtları | 11 | | | |
 | Sıcaklık doğruluğu | 1 | | | |
 
 Kabul kararı: ☐ Kabul ☐ Şartlı kabul ☐ Red  
