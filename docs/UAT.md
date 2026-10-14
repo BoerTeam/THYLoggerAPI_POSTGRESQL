@@ -79,15 +79,16 @@ Cihazın gönderim aralığı: `______` sn
 |---|---|---|---|---|---|
 | A-01 | – | Admin ile giriş yap, sol menüye bak. | **Denetim Kayıtları** menü öğesi görünür; tıklayınca sayfa açılır. | | |
 | A-02 | – | Admin olmayan kullanıcı ile giriş yap. | Menüde Denetim Kayıtları görünmez; `/AuditLog/Index` adresi doğrudan açılırsa "Erişim Reddedildi" sayfasına yönlenir. | | |
-| A-03 | – | Sayfayı filtresiz aç. | Kayıtlar en yeniden eskiye listelenir; tarihler Türkiye saatinde `gg.aa.yyyy SS:dd:ss` formatındadır; toplam sayı görünür. | | |
-| A-04 | – | **Varlık** ve **İşlem** listelerinden seçim yapıp Filtrele'ye tıkla. | Yalnızca seçilen varlık/işlem kayıtları gelir (örn. Varlık: Dolly, İşlem: Modified). | | |
+| A-03 | – | Menüden sayfayı **hiçbir filtre seçmeden** aç. | Tablo boş gelmez; kayıtlar en yeniden eskiye listelenir (açılışta gizli bir filtre uygulanmamalı); tarihler Türkiye saatinde `gg.aa.yyyy SS:dd:ss` formatındadır; toplam sayı görünür. | | |
+| A-04 | – | **Varlık** ve **İşlem** listelerinden seçim yapıp Filtrele'ye tıkla. | Yalnızca seçilen varlık/işlem kayıtları gelir (örn. Varlık: Dolly, İşlem: Modified). Seçilen işlem Filtrele sonrası listede seçili kalır. | | |
 | A-05 | – | Başlangıç ve bitiş tarihi seç (takvim `gg/aa/yyyy`), Filtrele. | Yalnızca seçilen aralıktaki kayıtlar gelir; ilk/son satırın saatini kontrol et. | | |
 | A-06 | – | Bir dolly adını düzenle ve kaydet; ardından Varlık: Dolly, İşlem: Modified filtrele. | Yeni bir kayıt oluşur; **Değerleri göster** ile eski ve yeni değer görünür. | | |
 | A-07 | – | **Değerlerde ara** alanına bir değer (örn. dolly adı) yaz. | Eski/yeni değerlerinde bu metin geçen kayıtlar gelir. | | |
 | A-08 | – | Kayıt No veya Kullanıcı alanı ile filtrele. | Yalnızca eşleşen kayıtlar gelir. *(Kullanıcı sütunu şu an kayıtlarda boş olabilir; bilinen sınırlama.)* | | |
-| A-09 | – | Satır sayısını 25 yapıp Sonraki / Önceki ile gez. | Sayfalama çalışır, uygulanan filtreler sayfa değişince korunur. | | |
+| A-09 | – | Bir işlem filtresi (örn. Added) seçip satır sayısını 25 yap; Sonraki / Önceki ile gez. | Sayfalama çalışır, işlem dahil uygulanan tüm filtreler sayfa değişince korunur. | | |
 | A-10 | – | Hiç eşleşmeyen bir filtre uygula. | "Kayıt bulunamadı." mesajı görünür, hata oluşmaz. | | |
 | A-11 | – | **Temizle**'ye tıkla. | Filtreler sıfırlanır, tüm kayıtlar listelenir. | | |
+| A-12 | – | Cihazdan yeni bir sıcaklık/nem verisi gönder (veya bir dolly ekle) ve sayfayı yenile. | Yeni işlem Varlık: Sicaklik / Nem / Dolly, İşlem: Added olarak en üstte görünür; Yeni değer detayında gönderilen değerler yer alır. | | |
 
 ## 8. Sıcaklık doğruluğu
 
@@ -113,7 +114,7 @@ Cihazın gönderim aralığı: `______` sn
 | Tarih formatı | 2 | | | |
 | Excel | 7 | | | |
 | Boş/Dolu | 4 | | | |
-| Denetim Kayıtları | 11 | | | |
+| Denetim Kayıtları | 12 | | | |
 | Sıcaklık doğruluğu | 1 | | | |
 
 Kabul kararı: ☐ Kabul ☐ Şartlı kabul ☐ Red  
