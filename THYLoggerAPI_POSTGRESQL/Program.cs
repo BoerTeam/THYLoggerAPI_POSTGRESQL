@@ -1,9 +1,11 @@
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 using THYLoggerAPI_POSTGRESQL.Context;
 using THYLoggerAPI_POSTGRESQL.Interceptors;
 using THYLoggerAPI_POSTGRESQL.Model;
 using THYLoggerAPI_POSTGRESQL.Services;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 
 AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 
@@ -42,6 +44,25 @@ builder.Services.AddScoped<NemService>();
 builder.Services.AddScoped<SicaklikService>();
 builder.Services.AddScoped<LatestService>();
 builder.Services.AddScoped<AuditLogService>();
+builder.Services.AddScoped<CoolDollyRequestService>();
+
+// BPM entegrasyonu: Rate limit (servis mapping dokümaný, bölüm 9: dakikada 100 istek)
+builder.Services.AddRateLimiter(options =>
+{
+    options.AddFixedWindowLimiter("bpm-limit", opt =>
+    {
+        opt.PermitLimit = 100;
+        opt.Window = TimeSpan.FromMinutes(1);
+        opt.QueueLimit = 0;
+    });
+    options.OnRejected = async (ctx, ct) =>
+    {
+        var ex = CoolDollyException.RateLimited();
+        ctx.HttpContext.Response.StatusCode = ex.StatusCode;
+        await ctx.HttpContext.Response.WriteAsJsonAsync(
+            THYLoggerAPI_POSTGRESQL.DTOs.CoolDollyResponse.Error(ex.Code, ex.Message), ct);
+    };
+});
 
 // PostgreSQL Baðlantýsý
 builder.Services.AddDbContext<ApplicationDbContext>((sp, options) =>
@@ -49,7 +70,8 @@ builder.Services.AddDbContext<ApplicationDbContext>((sp, options) =>
     var auditInterceptor = sp.GetRequiredService<AuditInterceptor>();
 
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"))
-           .AddInterceptors(auditInterceptor);
+           .AddInterceptors(auditInterceptor)
+           .ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning));
 });
 
 var app = builder.Build();
@@ -143,6 +165,15 @@ using (var scope = app.Services.CreateScope())
             Console.WriteLine("--> Denetim Kayýtlarý menü sayfasý eklendi.");
         }
 
+        // 7. Dolly Talepleri menü sayfasý (var olan kurulumlarda da eklenir; DOLLY_VIEW izni olanlar ve Admin görür)
+        if (!context.Pages.Any(p => p.Route == "/DollyRequest/Index"))
+        {
+            var nextOrder = context.Pages.Any() ? context.Pages.Max(p => p.Order) + 1 : 1;
+            context.Pages.Add(new Page { Name = "Dolly Talepleri", Route = "/DollyRequest/Index", PermissionCode = "DOLLY_VIEW", Icon = "list", Order = nextOrder });
+            context.SaveChanges();
+            Console.WriteLine("--> Dolly Talepleri menü sayfasý eklendi.");
+        }
+
         Console.WriteLine("--> Veritabaný, migrasyonlar ve varsayýlan veriler baþarýyla kontrol edildi.");
     }
     catch (Exception ex)
@@ -161,6 +192,7 @@ app.UseSwaggerUI(c =>
 });
 
 app.UseHttpsRedirection();
+app.UseRateLimiter();
 app.UseAuthorization();
 app.MapControllers();
 

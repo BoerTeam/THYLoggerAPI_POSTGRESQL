@@ -10,5 +10,6 @@ namespace Dashboard.Models
         public List<BosDolu> bosDolu { get; set; }
         public List<Gpsdatum> gpsdatum { get; set; }
         public List<Dolly> DollyList { get; set; }
+        public List<DollyRequestItemDto> OpenRequests { get; set; } = new();
     }
 }

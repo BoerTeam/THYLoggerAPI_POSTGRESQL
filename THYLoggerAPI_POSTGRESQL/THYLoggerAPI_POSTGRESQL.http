@@ -1,6 +1,118 @@
 @THYLoggerAPI_POSTGRESQL_HostAddress = http://localhost:5062
+@ApiKey = OTnKinqjAiKAK85pzwmVUA8Y7Pnw4FfeEPoEuptxgEdDfUp4BOZM1MSN6rv9Hg4i
+@DollyNo = TDC-E200GC2
+@RefNo = CD-YYYYMMDD-XXXXXXXX
 
-GET {{THYLoggerAPI_POSTGRESQL_HostAddress}}/weatherforecast/
+### 1) Talep kaydet (SUCCESS beklenir; cevaptaki referenceNumber'ı @RefNo'ya yapıştırın)
+POST {{THYLoggerAPI_POSTGRESQL_HostAddress}}/api/CoolDolly/CreateRequest
+Content-Type: application/json
+X-Api-Key: {{ApiKey}}
+
+{
+  "operationType": "OUTBOUND",
+  "awbNumber": "23512345678",
+  "flightNumber": "TK0001",
+  "flightDate": "2026-10-16",
+  "departureStation": "IST",
+  "arrivalStation": "JFK",
+  "sccCode": "PIL",
+  "uldNumber": "AKE12345TK",
+  "coolDollyNumber": "{{DollyNo}}"
+}
+
+### 2) Aynı isteği tekrar gönder (idempotent: aynı referenceNumber, "Talep zaten kayıtlı")
+POST {{THYLoggerAPI_POSTGRESQL_HostAddress}}/api/CoolDolly/CreateRequest
+Content-Type: application/json
+X-Api-Key: {{ApiKey}}
+
+{
+  "operationType": "OUTBOUND",
+  "awbNumber": "23512345678",
+  "flightNumber": "TK0001",
+  "flightDate": "2026-10-16",
+  "departureStation": "IST",
+  "arrivalStation": "JFK",
+  "sccCode": "PIL",
+  "uldNumber": "AKE12345TK",
+  "coolDollyNumber": "{{DollyNo}}"
+}
+
+### 3) Aynı Dolly'ye farklı AWB/ULD (409, CD-002 beklenir)
+POST {{THYLoggerAPI_POSTGRESQL_HostAddress}}/api/CoolDolly/CreateRequest
+Content-Type: application/json
+X-Api-Key: {{ApiKey}}
+
+{
+  "operationType": "INBOUND",
+  "awbNumber": "23587654321",
+  "flightNumber": "TK0002",
+  "flightDate": "2026-10-16",
+  "departureStation": "JFK",
+  "arrivalStation": "IST",
+  "sccCode": "PIL",
+  "uldNumber": "PMC54321TK",
+  "coolDollyNumber": "{{DollyNo}}"
+}
+
+### 4) Geçersiz işlem tipi (400, CD-005 beklenir)
+POST {{THYLoggerAPI_POSTGRESQL_HostAddress}}/api/CoolDolly/CreateRequest
+Content-Type: application/json
+X-Api-Key: {{ApiKey}}
+
+{
+  "operationType": "XYZ",
+  "awbNumber": "23512345678",
+  "flightNumber": "TK0001",
+  "flightDate": "2026-10-16",
+  "departureStation": "IST",
+  "arrivalStation": "JFK",
+  "uldNumber": "AKE12345TK",
+  "coolDollyNumber": "{{DollyNo}}"
+}
+
+### 5) Var olmayan Dolly (400, CD-001 beklenir)
+POST {{THYLoggerAPI_POSTGRESQL_HostAddress}}/api/CoolDolly/CreateRequest
+Content-Type: application/json
+X-Api-Key: {{ApiKey}}
+
+{
+  "operationType": "OUTBOUND",
+  "awbNumber": "23512345678",
+  "flightNumber": "TK0001",
+  "flightDate": "2026-10-16",
+  "departureStation": "IST",
+  "arrivalStation": "JFK",
+  "uldNumber": "AKE12345TK",
+  "coolDollyNumber": "YOK-BOYLE-BIR-DOLLY"
+}
+
+### 6) API key olmadan (401, CD-008 beklenir)
+POST {{THYLoggerAPI_POSTGRESQL_HostAddress}}/api/CoolDolly/CreateRequest
+Content-Type: application/json
+
+{ "operationType": "OUTBOUND" }
+
+### 7) Talep sonlandır (SUCCESS, Dolly tekrar müsait)
+POST {{THYLoggerAPI_POSTGRESQL_HostAddress}}/api/CoolDolly/TerminateRequest
+Content-Type: application/json
+X-Api-Key: {{ApiKey}}
+
+{
+  "operationType": "OUTBOUND",
+  "requestReferenceNo": "{{RefNo}}",
+  "flightNumber": "TK0001",
+  "flightDate": "2026-10-16",
+  "coolDollyNumber": "{{DollyNo}}"
+}
+
+### 8) Liste ekranı: açık talepler (Dolly içindeki ULD/AWB'ler)
+GET {{THYLoggerAPI_POSTGRESQL_HostAddress}}/api/DollyRequest/GetAll?status=Open&page=1&pageSize=50
 Accept: application/json
 
-###
+### 9) Liste ekranı: Cool Dolly No ile filtre
+GET {{THYLoggerAPI_POSTGRESQL_HostAddress}}/api/DollyRequest/GetAll?coolDollyNo={{DollyNo}}
+Accept: application/json
+
+### 10) Bir Dolly'nin içindeki açık kayıtlar (DollyId = 1)
+GET {{THYLoggerAPI_POSTGRESQL_HostAddress}}/api/DollyRequest/GetByDolly/1
+Accept: application/json

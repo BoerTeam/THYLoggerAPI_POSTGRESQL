@@ -16,6 +16,7 @@ namespace THYLoggerAPI_POSTGRESQL.Context
         public DbSet<Nem> Nem { get; set; }
         public DbSet<Sicaklik> Sicaklik { get; set; }
         public DbSet<Dolly> Dolly { get; set; }
+        public DbSet<DollyRequest> DollyRequests { get; set; }
 
         public DbSet<User> Users { get; set; }
         public DbSet<AuditLog> AuditLogs { get; set; }
@@ -184,8 +185,45 @@ namespace THYLoggerAPI_POSTGRESQL.Context
 
 
             // ==========================================
+            // DOLLY REQUEST (BPM -> Cool Dolly talepleri)
+            // ==========================================
+
+            modelBuilder.Entity<DollyRequest>(builder =>
+            {
+                builder.HasKey(x => x.Id);
+
+                builder.Property(x => x.ReferenceNumber).HasMaxLength(50).IsRequired();
+                builder.Property(x => x.OperationType).HasConversion<string>().HasMaxLength(10).IsRequired();
+                builder.Property(x => x.AwbNumber).HasMaxLength(20).IsRequired();
+                builder.Property(x => x.FlightNumber).HasMaxLength(10).IsRequired();
+                builder.Property(x => x.DepartureStation).HasMaxLength(3).IsRequired();
+                builder.Property(x => x.ArrivalStation).HasMaxLength(3).IsRequired();
+                builder.Property(x => x.SccCode).HasMaxLength(50);
+                builder.Property(x => x.UldNumber).HasMaxLength(20).IsRequired();
+                builder.Property(x => x.Status).HasConversion<string>().HasMaxLength(20).IsRequired();
+
+                builder.HasIndex(x => x.ReferenceNumber).IsUnique();
+                builder.HasIndex(x => x.AwbNumber);
+                builder.HasIndex(x => x.UldNumber);
+                builder.HasIndex(x => new { x.FlightNumber, x.FlightDate });
+
+                // Bir Dolly'nin aynı anda yalnızca 1 açık talebi olabilir (CD-002'nin DB seviyesinde garantisi)
+                builder.HasIndex(x => x.DollyId)
+                    .IsUnique()
+                    .HasFilter("\"Status\" = 'Open'")
+                    .HasDatabaseName(DollyRequest.OpenPerDollyIndexName);
+
+                builder.HasOne(x => x.Dolly)
+                    .WithMany()
+                    .HasForeignKey(x => x.DollyId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+
+            // ==========================================
             // SEED DATA (BAŞLANGIÇ VERİLERİ)
             // ==========================================
+            var seedDate = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
             // 1. Temel Roller
             modelBuilder.Entity<Role>().HasData(

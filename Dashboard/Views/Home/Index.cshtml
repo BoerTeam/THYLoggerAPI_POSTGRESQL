@@ -24,7 +24,11 @@ else
                 var sonNem = Model.nem.Where(x => x.DollyId == dolly.Id).OrderByDescending(x => x.Time).FirstOrDefault();
                 var sonDurum = Model.bosDolu.Where(x => x.DollyId == dolly.Id).OrderByDescending(x => x.Time).FirstOrDefault();
                 var sonGps = Model.gpsdatum.Where(x => x.DollyId == dolly.Id).OrderByDescending(x => x.Time).FirstOrDefault();
-                
+                // Dolly'nin içindeki (açık talepteki) ULD No ve SCC bilgileri
+var dollyOpen = Model.OpenRequests.Where(x => x.DollyId == dolly.Id).ToList();
+string uldText = dollyOpen.Count > 0 ? string.Join(", ", dollyOpen.Select(x => x.UldNo)) : "-";
+var sccList = dollyOpen.Where(x => !string.IsNullOrEmpty(x.SccCode)).Select(x => x.SccCode).Distinct().ToList();
+string sccText = sccList.Count > 0 ? string.Join(", ", sccList) : "-";
                 double sicaklikDegeri = sonSicaklik?.Sicaklik1 ?? 0;
 
                 string latVal = sonGps?.Latitude?.ToString(CultureInfo.InvariantCulture) ?? "";
@@ -51,6 +55,10 @@ else
                                     <h6 class="fw-bold" data-field="nem">%@(sonNem?.Nem1?.ToString("0") ?? "0")</h6>
                                 </div>
                             </div>
+                            <div class="text-white mt-1 pt-1" style="border-top: 1px solid rgba(255,255,255,.4); font-size: .8rem;">
+    <div>ULD: <b data-field="uld">@uldText</b></div>
+    <div>SCC: <b data-field="scc">@sccText</b></div>
+</div>
                             <small class="d-block text-white mt-1" style="opacity:.8" data-field="updated">@(sonSicaklik?.Time?.ToString("dd.MM.yyyy HH:mm:ss") ?? "-")</small>
                         </div>
                     </div>
@@ -422,7 +430,13 @@ else
                     if (!res.ok) return;
                     const list = await res.json();
                     if (!Array.isArray(list)) return;
-
+                    const gelenIdler = new Set(list.map(d => d.dollyId));
+document.querySelectorAll('.doly-card').forEach(card => {
+    if (!gelenIdler.has(parseInt(card.getAttribute('data-dolly-id')))) {
+        const u = card.querySelector('[data-field="uld"]'); if (u) u.textContent = '-';
+        const s = card.querySelector('[data-field="scc"]'); if (s) s.textContent = '-';
+    }
+});
                     const modalEl = document.getElementById('xlargeModal');
                     const modalOpen = modalEl.classList.contains('show');
                     const openId = parseInt(modalEl.getAttribute('data-current-id'));
@@ -440,7 +454,10 @@ else
                         card.querySelector('[data-field="temp"]').textContent = `${temp.toFixed(1).replace(',', '.')}°C`;
                         card.querySelector('[data-field="nem"]').textContent = `%${Math.round(d.nem ?? 0)}`;
                         card.querySelector('[data-field="updated"]').textContent = d.updated ?? '-';
-
+                        const uldEl = card.querySelector('[data-field="uld"]');
+if (uldEl) uldEl.textContent = d.uldNo || '-';
+const sccEl = card.querySelector('[data-field="scc"]');
+if (sccEl) sccEl.textContent = d.sccCode || '-';
                         // Detay penceresi bu dolly icin aciksa onu da guncelle
                         if (modalOpen && openId === d.dollyId) {
                             modalEl.setAttribute('data-current-lat', d.lat ?? '');

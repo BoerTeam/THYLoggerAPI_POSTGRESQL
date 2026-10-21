@@ -1,0 +1,191 @@
+﻿@model Dashboard.DTO.DollyRequestIndexViewModel
+@using System.Globalization
+
+@{
+    ViewData["Title"] = "Dolly Talepleri";
+    var f = Model.Filter;
+    var tr = TimeZoneInfo.FindSystemTimeZoneById("Turkey Standard Time");
+    var totalPages = Math.Max(1, (int)Math.Ceiling(Model.Result.Total / (double)f.PageSize));
+
+    string PageUrl(int p) => Url.Action("Index", "DollyRequest", new
+    {
+        coolDollyNo = f.CoolDollyNo,
+        awbNo = f.AwbNo,
+        uldNo = f.UldNo,
+        flightNo = f.FlightNo,
+        flightDateFrom = f.FlightDateFrom,
+        flightDateTo = f.FlightDateTo,
+        operationType = f.OperationType,
+        status = f.Status,
+        pageSize = f.PageSize,
+        page = p
+    })!;
+
+    string FlightDateText(string? s) =>
+        DateOnly.TryParseExact(s, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var d)
+            ? d.ToString("dd.MM.yyyy")
+            : (s ?? "");
+
+    // API UTC döner; ekranda Türkiye saati gösterilir
+    string LocalText(DateTime utc) =>
+        TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utc, DateTimeKind.Utc), tr).ToString("dd.MM.yyyy HH:mm");
+}
+
+<link rel="stylesheet" href="~/app-assets/vendors/css/pickers/flatpickr/flatpickr.min.css" />
+
+<div class="container-fluid mt-4">
+    <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0 text-white">Dolly Talepleri (ULD / AWB Detayı)</h5>
+            <span class="badge bg-light text-dark">Toplam: @Model.Result.Total</span>
+        </div>
+        <div class="card-body">
+            @if (Model.ApiError)
+            {
+                <div class="alert alert-danger p-2">Dolly talepleri API'den alınamadı.</div>
+            }
+
+            <form method="get" asp-action="Index" asp-controller="DollyRequest" class="row g-2 mb-3 align-items-end">
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold mb-0">Cool Dolly No</label>
+                    <input type="text" name="coolDollyNo" class="form-control form-control-sm" value="@f.CoolDollyNo" placeholder="örn. TDC-E200GC2" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold mb-0">AWB No</label>
+                    <input type="text" name="awbNo" class="form-control form-control-sm" value="@f.AwbNo" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold mb-0">ULD No</label>
+                    <input type="text" name="uldNo" class="form-control form-control-sm" value="@f.UldNo" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold mb-0">Uçuş No</label>
+                    <input type="text" name="flightNo" class="form-control form-control-sm" value="@f.FlightNo" placeholder="örn. TK0001" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold mb-0">Uçuş Tarihi (Başlangıç)</label>
+                    <input type="text" name="flightDateFrom" class="form-control form-control-sm dr-date" value="@f.FlightDateFrom" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold mb-0">Uçuş Tarihi (Bitiş)</label>
+                    <input type="text" name="flightDateTo" class="form-control form-control-sm dr-date" value="@f.FlightDateTo" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold mb-0">İşlem Tipi</label>
+                    <select name="operationType" class="form-select form-select-sm">
+                        <option value="">Tümü</option>
+                        <option value="INBOUND" selected="@(f.OperationType == "INBOUND")">INBOUND</option>
+                        <option value="OUTBOUND" selected="@(f.OperationType == "OUTBOUND")">OUTBOUND</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold mb-0">Durum</label>
+                    <select name="status" class="form-select form-select-sm">
+                        <option value="Open" selected="@(f.Status == "Open")">Açık (Dolly'de)</option>
+                        <option value="Terminated" selected="@(f.Status == "Terminated")">Sonlandırılmış</option>
+                        <option value="All" selected="@(f.Status == "All")">Tümü</option>
+                    </select>
+                </div>
+                <div class="col-md-1">
+                    <label class="form-label small fw-bold mb-0">Satır</label>
+                    <select name="pageSize" class="form-select form-select-sm">
+                        @foreach (var s in new[] { 25, 50, 100, 200 })
+                        {
+                            <option value="@s" selected="@(s == f.PageSize)">@s</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-auto">
+                    <button type="submit" class="btn btn-primary btn-sm">Filtrele</button>
+                    <a asp-action="Index" asp-controller="DollyRequest" class="btn btn-outline-secondary btn-sm">Temizle</a>
+                </div>
+            </form>
+
+            <div class="table-responsive">
+                <table class="table table-hover table-bordered align-middle table-sm">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Cool Dolly No</th>
+                            <th>AWB No</th>
+                            <th>İşlem</th>
+                            <th>Uçuş No</th>
+                            <th>Uçuş Tarihi</th>
+                            <th>Çıkış</th>
+                            <th>Varış</th>
+                            <th>SCC</th>
+                            <th>ULD No</th>
+                            <th>Durum</th>
+                            <th class="text-nowrap">Talep Zamanı (TR)</th>
+                            <th>Referans No</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in Model.Result.Items)
+                        {
+                            <tr>
+                                <td>
+                                    <div class="fw-bold">@item.CoolDollyName</div>
+                                    <div class="small text-muted">Seri: @item.CoolDollySerialNumber</div>
+                                </td>
+                                <td class="text-nowrap">@item.AwbNo</td>
+                                <td>
+                                    @if (item.OperationType == "INBOUND")
+                                    {
+                                        <span class="badge rounded-pill bg-light-primary text-primary">INBOUND</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge rounded-pill bg-light-warning text-warning">@item.OperationType</span>
+                                    }
+                                </td>
+                                <td class="text-nowrap">@item.FlightNo</td>
+                                <td class="text-nowrap">@FlightDateText(item.FlightDate)</td>
+                                <td>@item.DepartureStation</td>
+                                <td>@item.ArrivalStation</td>
+                                <td>@(string.IsNullOrEmpty(item.SccCode) ? "-" : item.SccCode)</td>
+                                <td class="text-nowrap">@item.UldNo</td>
+                                <td>
+                                    @if (item.Status == "Open")
+                                    {
+                                        <span class="badge rounded-pill bg-light-success text-success">Açık</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge rounded-pill bg-light-secondary text-secondary"
+                                              title="@(item.TerminatedAt.HasValue ? "Sonlandırma: " + LocalText(item.TerminatedAt.Value) : "")">Sonlandırıldı</span>
+                                    }
+                                </td>
+                                <td class="text-nowrap">@LocalText(item.CreatedAt)</td>
+                                <td class="small text-nowrap">@item.ReferenceNumber</td>
+                            </tr>
+                        }
+                        @if (!Model.Result.Items.Any())
+                        {
+                            <tr><td colspan="12" class="text-center text-muted">Kayıt bulunamadı.</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <nav class="d-flex justify-content-between align-items-center">
+                <span class="small text-muted">Sayfa @f.Page / @totalPages</span>
+                <ul class="pagination pagination-sm mb-0">
+                    <li class="page-item @(f.Page <= 1 ? "disabled" : "")"><a class="page-link" href="@PageUrl(f.Page - 1)">Önceki</a></li>
+                    <li class="page-item @(f.Page >= totalPages ? "disabled" : "")"><a class="page-link" href="@PageUrl(f.Page + 1)">Sonraki</a></li>
+                </ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            // Tarihler gün/ay/yıl gösterilir, sunucuya yyyy-MM-dd gider
+            flatpickr('.dr-date', {
+                altInput: true, altFormat: 'd/m/Y', dateFormat: 'Y-m-d',
+                locale: { firstDayOfWeek: 1 }, static: true, allowInput: false
+            });
+        });
+    </script>
+}

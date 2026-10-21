@@ -39,8 +39,9 @@ namespace Dashboard.Controllers
             // Sadece her dolly'nin son kayitlari cekilir (tum tablolar degil)
             var snapshotTask = _apiService.GetAsync<LatestSnapshot>("api/Latest/GetAll");
             var dollyTask = _apiService.GetAsync<List<Dolly>>("api/Dolly/GetAll");
+            var openTask = _apiService.GetAsync<List<DollyRequestItemDto>>("api/DollyRequest/GetOpen");
 
-            await Task.WhenAll(snapshotTask, dollyTask);
+            await Task.WhenAll(snapshotTask, dollyTask, openTask);
 
             var snapshot = await snapshotTask ?? new LatestSnapshot();
             var multiModel = new MultiModel
@@ -49,7 +50,8 @@ namespace Dashboard.Controllers
                 Sicaklik = snapshot.Sicaklik,
                 bosDolu = snapshot.BosDolu,
                 DollyList = await dollyTask ?? new List<Dolly>(),
-                gpsdatum = snapshot.Gps
+                gpsdatum = snapshot.Gps,
+                OpenRequests = await openTask ?? new List<DollyRequestItemDto>()
             };
 
             return View(multiModel);
@@ -278,11 +280,17 @@ namespace Dashboard.Controllers
                 return Json(new { error = "Yetkisiz erisim" });
             }
 
-            var snapshot = await _apiService.GetAsync<LatestSnapshot>("api/Latest/GetAll") ?? new LatestSnapshot();
+            var snapshotTask = _apiService.GetAsync<LatestSnapshot>("api/Latest/GetAll");
+            var openTask = _apiService.GetAsync<List<DollyRequestItemDto>>("api/DollyRequest/GetOpen");
+            await Task.WhenAll(snapshotTask, openTask);
+
+            var snapshot = await snapshotTask ?? new LatestSnapshot();
+            var openRequests = await openTask ?? new List<DollyRequestItemDto>();
             var dollyIds = snapshot.Sicaklik.Select(x => x.DollyId)
                 .Union(snapshot.Nem.Select(x => x.DollyId))
                 .Union(snapshot.Gps.Select(x => x.DollyId))
-                .Union(snapshot.BosDolu.Select(x => x.DollyId));
+                .Union(snapshot.BosDolu.Select(x => x.DollyId))
+                .Union(openRequests.Select(x => x.DollyId));
 
             var result = dollyIds.Select(id =>
             {
@@ -290,6 +298,7 @@ namespace Dashboard.Controllers
                 var n = snapshot.Nem.FirstOrDefault(x => x.DollyId == id);
                 var g = snapshot.Gps.FirstOrDefault(x => x.DollyId == id);
                 var b = snapshot.BosDolu.FirstOrDefault(x => x.DollyId == id);
+                var o = openRequests.Where(x => x.DollyId == id).ToList();
                 return new
                 {
                     dollyId = id,
@@ -299,7 +308,9 @@ namespace Dashboard.Controllers
                     lng = g?.Longitude,
                     isFull = b?.SensorDegeri ?? false,
                     updated = s?.Time?.ToString("dd.MM.yyyy HH:mm:ss"),
-                    gpsTime = g?.Time?.ToString("dd.MM.yyyy HH:mm:ss")
+                    gpsTime = g?.Time?.ToString("dd.MM.yyyy HH:mm:ss"),
+                    uldNo = string.Join(", ", o.Select(x => x.UldNo)),
+                    sccCode = string.Join(", ", o.Where(x => !string.IsNullOrEmpty(x.SccCode)).Select(x => x.SccCode).Distinct())
                 };
             }).ToList();
 
