@@ -68,6 +68,7 @@ string sccText = sccList.Count > 0 ? string.Join(", ", sccList) : "-";
 
         <style>
             .map-location-label { background: rgba(255,255,255,.85); border: 0; box-shadow: none; font-weight: 600; font-size: 11px; padding: 1px 4px; }
+            .map-labels-hidden .map-location-label { display: none; }
         </style>
 
         <!-- Dolly Detay Modal -->
@@ -375,7 +376,11 @@ string sccText = sccList.Count > 0 ? string.Join(", ", sccList) : "-";
                                 minZoom: 12,
                                 maxZoom: 16,
                                 maxBounds: mapTileBounds,
-                                maxBoundsViscosity: 0.8
+                                maxBoundsViscosity: 0.8,
+                scrollWheelZoom: true,   // fare tekerlegi ile zoom
+                zoomSnap: 0.25,
+                zoomDelta: 0.5,
+                wheelPxPerZoomLevel: 90
                             });
 
                             L.tileLayer('/map/files/{z}/{x}/{y}png.tile', {
@@ -386,14 +391,23 @@ string sccText = sccList.Count > 0 ? string.Join(", ", sccList) : "-";
 
                             marker = L.marker([lat, lng]).addTo(map);
 
+                            // 449 pozisyon etiketi dusuk zoomda kalabalik yaptigi icin sadece yakinlasinca gosterilir
+                            const toggleLabels = () => map.getContainer().classList.toggle('map-labels-hidden', map.getZoom() < 15);
+                            map.on('zoomend', toggleLabels);
+                            toggleLabels();
+
                             // Sabit lokasyonlar (wwwroot/map/locations.json); koordinati bos olanlar atlanir
                             const currentMap = map;
                             fetch('/map/locations.json')
                                 .then(r => r.json())
                                 .then(locs => locs.forEach(loc => {
-                                    if (loc.lat == null || loc.lng == null || map !== currentMap) return;
-                                    L.circle([loc.lat, loc.lng], { radius: loc.radius || 100, color: loc.color || '#7367f0', weight: 2, fillOpacity: 0.15 })
-                                        .addTo(currentMap)
+                                    if (map !== currentMap) return;
+                                    const style = { color: loc.color || '#7367f0', weight: 2, fillOpacity: 0.15 };
+                                    let shape;
+                                    if (loc.bounds) shape = L.rectangle(loc.bounds, style);          // [[y1,x1],[y2,x2]]
+                                    else if (loc.lat != null && loc.lng != null) shape = L.circle([loc.lat, loc.lng], { ...style, radius: loc.radius || 100 });
+                                    else return;
+                                    shape.addTo(currentMap)
                                         .bindTooltip(loc.name, { permanent: true, direction: 'center', className: 'map-location-label' });
                                 }))
                                 .catch(() => { });
