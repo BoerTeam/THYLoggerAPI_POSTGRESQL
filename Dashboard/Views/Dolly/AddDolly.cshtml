@@ -24,6 +24,11 @@
                     <input type="text" asp-for="Name" class="form-control" placeholder="Örn: TDC-V3" required />
                 </div>
 
+                <div class="col-12 col-md-6 mb-1">
+                    <label class="form-label" asp-for="PanoNo">Pano No</label>
+                    <input type="text" asp-for="PanoNo" class="form-control" placeholder="Örn: CD-26-0001" maxlength="50" />
+                </div>
+
                 <div class="col-12 mb-2">
                     <div class="form-check form-switch form-check-primary">
                         <input type="checkbox" asp-for="IsActive" class="form-check-input" checked />

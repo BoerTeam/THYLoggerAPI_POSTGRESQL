@@ -36,6 +36,7 @@ else
                     <thead class="table-light">
                         <tr>
                             <th>Seri Numarası</th>
+                            <th>Pano No</th>
                             <th>İsim</th>
                             <th>Durum</th>
                             <th class="text-center">İşlemler</th>
@@ -48,6 +49,7 @@ else
                             {
                                 <tr>
                                     <td>@item.SerialNumber</td>
+                                    <td>@(string.IsNullOrEmpty(item.PanoNo) ? "-" : item.PanoNo)</td>
                                     <td>@item.Name</td>
                                     <td>
                                         @if (item.IsActive)
@@ -79,7 +81,7 @@ else
                         else
                         {
                             <tr>
-                                <td colspan="4" class="text-center text-muted">Kayıtlı Dolly bulunamadı.</td>
+                                <td colspan="5" class="text-center text-muted">Kayıtlı Dolly bulunamadı.</td>
                             </tr>
                         }
                     </tbody>
