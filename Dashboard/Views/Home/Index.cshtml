@@ -277,6 +277,7 @@ string sccText = sccList.Count > 0 ? string.Join(", ", sccList) : "-";
                 const excelPickers = flatpickr('.excel-datetime', {
                     enableTime: true,
                     time_24hr: true,
+                                minuteIncrement: 1,
                     altInput: true,
                     altFormat: 'd/m/Y H:i',
                     dateFormat: 'Y-m-d\TH:i',
