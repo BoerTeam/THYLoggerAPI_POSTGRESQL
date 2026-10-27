@@ -26,7 +26,7 @@ namespace THYLoggerAPI_POSTGRESQL.Controllers
         }
 
         // createCoolDollyRequest  ->  POST /api/CoolDolly/CreateRequest
-        [HttpPost("CreateRequest")]
+        [HttpPost("CreateCoolDollyRequest")]
         public async Task<IActionResult> CreateCoolDollyRequest([FromBody] CreateCoolDollyRequestDto dto)
         {
             try
@@ -47,7 +47,7 @@ namespace THYLoggerAPI_POSTGRESQL.Controllers
         }
 
         // terminateCoolDollyRequest  ->  POST /api/CoolDolly/TerminateRequest
-        [HttpPost("TerminateRequest")]
+        [HttpPost("TerminateCoolDollyRequest")]
         public async Task<IActionResult> TerminateCoolDollyRequest([FromBody] TerminateCoolDollyRequestDto dto)
         {
             try
