@@ -17,6 +17,8 @@ namespace THYLoggerAPI_POSTGRESQL.Context
         public DbSet<Sicaklik> Sicaklik { get; set; }
         public DbSet<Dolly> Dolly { get; set; }
         public DbSet<DollyRequest> DollyRequests { get; set; }
+        public DbSet<DollySetting> DollySettings { get; set; }
+        public DbSet<DollyConfigEvent> DollyConfigEvents { get; set; }
 
         public DbSet<User> Users { get; set; }
         public DbSet<AuditLog> AuditLogs { get; set; }
@@ -217,6 +219,46 @@ namespace THYLoggerAPI_POSTGRESQL.Context
                     .WithMany()
                     .HasForeignKey(x => x.DollyId)
                     .OnDelete(DeleteBehavior.Restrict);
+            });
+
+
+            // ==========================================
+            // DOLLY SETTINGS (cihaz uzaktan konfigürasyonu)
+            // ==========================================
+
+            modelBuilder.Entity<DollySetting>(builder =>
+            {
+                builder.ToTable("DollySettings");
+                builder.HasKey(x => x.Id);
+
+                builder.Property(x => x.ConfigJson).HasColumnType("jsonb").IsRequired();
+                builder.Property(x => x.DeviceType).HasMaxLength(50);
+                builder.Property(x => x.AppVersion).HasMaxLength(50);
+                builder.Property(x => x.LastError).HasMaxLength(1000);
+
+                builder.HasIndex(x => x.DollyId).IsUnique();
+
+                builder.HasOne(x => x.Dolly)
+                    .WithMany()
+                    .HasForeignKey(x => x.DollyId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<DollyConfigEvent>(builder =>
+            {
+                builder.ToTable("DollyConfigEvents");
+                builder.HasKey(x => x.Id);
+
+                builder.Property(x => x.EventType).HasMaxLength(20).IsRequired();
+                builder.Property(x => x.Message).HasMaxLength(1000);
+
+                builder.HasIndex(x => new { x.DollyId, x.CreatedAt });
+                builder.HasIndex(x => x.CreatedAt);
+
+                builder.HasOne(x => x.Dolly)
+                    .WithMany()
+                    .HasForeignKey(x => x.DollyId)
+                    .OnDelete(DeleteBehavior.Cascade);
             });
 
 

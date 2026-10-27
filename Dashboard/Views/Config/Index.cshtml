@@ -1,0 +1,236 @@
+@model Dashboard.DTO.ConfigIndexViewModel
+@using Dashboard.DTO
+
+@{
+    ViewData["Title"] = "Cihaz Konfigürasyonu";
+    var c = Model.Config;
+}
+
+<div class="container-fluid mt-4">
+    @if (TempData["ConfigSuccess"] is string ok)
+    {
+        <div class="alert alert-success p-1">@ok</div>
+    }
+    @if (TempData["ConfigError"] is string err)
+    {
+        <div class="alert alert-danger p-1">@err</div>
+    }
+    @if (Model.ApiError)
+    {
+        <div class="alert alert-danger p-1">Cihaz listesi veya varsayılan konfigürasyon API'den alınamadı.</div>
+    }
+
+    <form method="post" asp-action="Publish" asp-controller="Config" id="publishForm">
+        <div class="card shadow-sm mb-2">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 text-white">1. Cihazları Seç</h5>
+                <span class="badge bg-light text-dark">Seçili: <span id="selCount">0</span> / @Model.Devices.Items.Count</span>
+            </div>
+            <div class="card-body">
+                <div class="row g-1 mb-1 align-items-end">
+                    <div class="col-md-3">
+                        <label class="form-label small fw-bold mb-0">Cihaz modeline göre seç</label>
+                        <select id="typeSelect" class="form-select form-select-sm">
+                            <option value="">Model seçin</option>
+                            @foreach (var t in Model.Devices.DeviceTypes)
+                            {
+                                <option value="@t">@t (@Model.Devices.Items.Count(i => i.DeviceType == t) cihaz)</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-auto">
+                        <button type="button" class="btn btn-outline-primary btn-sm" id="btnSelType">Modeli seç</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" id="btnSelAll">Tümünü seç</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" id="btnSelNone">Temizle</button>
+                    </div>
+                    <div class="col-md-3 ms-auto">
+                        <input type="text" id="deviceFilter" class="form-control form-control-sm" placeholder="Ad / seri no ara" />
+                    </div>
+                </div>
+                <div class="small text-muted mb-1">Model bilgisi cihaz ilk kez config çektiğinde öğrenilir; hiç bağlanmamış cihazlar tek tek işaretlenmelidir.</div>
+
+                <div class="table-responsive" style="max-height:420px; overflow:auto">
+                    <table class="table table-hover table-bordered align-middle table-sm" id="deviceTable">
+                        <thead class="table-light" style="position:sticky; top:0">
+                            <tr>
+                                <th style="width:36px"></th>
+                                <th>Ad</th>
+                                <th>Seri No</th>
+                                <th>Model</th>
+                                <th>Uygulama</th>
+                                <th>Sunucu cfg</th>
+                                <th>Uygulanan cfg</th>
+                                <th>Durum</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var d in Model.Devices.Items)
+                            {
+                                <tr data-type="@d.DeviceType" data-search="@((d.Name + " " + d.SerialNumber).ToLowerInvariant())">
+                                    <td><input type="checkbox" class="form-check-input dev-check" name="DollyIds" value="@d.DollyId" /></td>
+                                    <td>@d.Name</td>
+                                    <td>@d.SerialNumber</td>
+                                    <td>@(d.DeviceType ?? "-")</td>
+                                    <td>@(d.AppVersion ?? "-")</td>
+                                    <td>@(d.ServerConfigVersion?.ToString() ?? "-")</td>
+                                    <td>@(d.AppliedConfigVersion?.ToString() ?? "-")</td>
+                                    <td><span class="badge @ConfigStatusText.Badge(d.Status)">@ConfigStatusText.Label(d.Status)</span></td>
+                                </tr>
+                            }
+                            @if (!Model.Devices.Items.Any())
+                            {
+                                <tr><td colspan="8" class="text-center text-muted">Cihaz bulunamadı.</td></tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm mb-2">
+            <div class="card-header bg-primary text-white"><h5 class="mb-0 text-white">2. Konfigürasyon</h5></div>
+            <div class="card-body">
+                <div class="row g-1">
+                    <div class="col-md-2">
+                        <label class="form-label small fw-bold mb-0">Config kontrol (sn)</label>
+                        <input type="number" min="1" required name="Config.ConfigPollIntervalSec" value="@c.ConfigPollIntervalSec" class="form-control form-control-sm" />
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small fw-bold mb-0">Okuma (sn)</label>
+                        <input type="number" min="1" required name="Config.ReadIntervalSec" value="@c.ReadIntervalSec" class="form-control form-control-sm" />
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small fw-bold mb-0">Gönderim (sn)</label>
+                        <input type="number" min="1" required name="Config.SendIntervalSec" value="@c.SendIntervalSec" class="form-control form-control-sm" />
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small fw-bold mb-0">GPS (sn)</label>
+                        <input type="number" min="1" required name="Config.GpsIntervalSec" value="@c.GpsIntervalSec" class="form-control form-control-sm" />
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small fw-bold mb-0">GPS fix yok log (sn)</label>
+                        <input type="number" min="1" required name="Config.GpsNoFixLogIntervalSec" value="@c.GpsNoFixLogIntervalSec" class="form-control form-control-sm" />
+                    </div>
+                </div>
+
+                <h6 class="mt-2 mb-1">Gönderilecek veriler</h6>
+                <div class="d-flex flex-wrap gap-2">
+                    @foreach (var (key, label, val) in new[] {
+                        ("Nem", "Nem", c.Senders.Nem), ("Sicaklik", "Sıcaklık", c.Senders.Sicaklik),
+                        ("Gps", "GPS", c.Senders.Gps), ("DoluBos", "Dolu/Boş", c.Senders.DoluBos) })
+                    {
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" id="snd@(key)" name="Config.Senders.@key" value="true" checked="@val" />
+                            <input type="hidden" name="Config.Senders.@key" value="false" />
+                            <label class="form-check-label" for="snd@(key)">@label</label>
+                        </div>
+                    }
+                </div>
+
+                <h6 class="mt-2 mb-1">Analog kanallar</h6>
+                <table class="table table-bordered table-sm align-middle" id="channelTable">
+                    <thead class="table-light">
+                        <tr><th>Kanal</th><th>Birim</th><th style="width:70px">Gönder</th><th>Ölçüm (measurement)</th><th style="width:50px"></th></tr>
+                    </thead>
+                    <tbody>
+                        @for (var i = 0; i < c.AnalogChannels.Count; i++)
+                        {
+                            var ch = c.AnalogChannels[i];
+                            <tr class="ch-row">
+                                <td><input type="text" required class="form-control form-control-sm" data-f="Channel" name="Config.AnalogChannels[@i].Channel" value="@ch.Channel" /></td>
+                                <td><input type="text" required class="form-control form-control-sm" data-f="Unit" name="Config.AnalogChannels[@i].Unit" value="@ch.Unit" /></td>
+                                <td class="text-center">
+                                    <input type="checkbox" class="form-check-input" data-f="Send" name="Config.AnalogChannels[@i].Send" value="true" checked="@ch.Send" />
+                                    <input type="hidden" data-f="Send" name="Config.AnalogChannels[@i].Send" value="false" />
+                                </td>
+                                <td><input type="text" class="form-control form-control-sm" data-f="Measurement" name="Config.AnalogChannels[@i].Measurement" value="@ch.Measurement" /></td>
+                                <td class="text-center"><button type="button" class="btn btn-outline-danger btn-sm py-0 ch-del">×</button></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="btnAddCh">+ Kanal ekle</button>
+
+                <h6 class="mt-2 mb-1">Endpoint'ler</h6>
+                <div class="row g-1">
+                    @foreach (var (key, label, val) in new[] {
+                        ("Nem", "Nem", c.Endpoints.Nem), ("Sicaklik", "Sıcaklık", c.Endpoints.Sicaklik),
+                        ("Gps", "GPS", c.Endpoints.Gps), ("DoluBos", "Dolu/Boş", c.Endpoints.DoluBos) })
+                    {
+                        <div class="col-md-3">
+                            <label class="form-label small fw-bold mb-0">@label</label>
+                            <input type="text" required pattern="/.*" name="Config.Endpoints.@key" value="@val" class="form-control form-control-sm" />
+                        </div>
+                    }
+                </div>
+
+                <div class="row g-1 mt-2">
+                    <div class="col-md-6">
+                        <label class="form-label small fw-bold mb-0">Not (isteğe bağlı, raporda görünür)</label>
+                        <input type="text" name="Note" maxlength="200" class="form-control form-control-sm" />
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-end mb-3">
+            <button type="submit" class="btn btn-primary" id="btnPublish">Seçili cihazlara gönder</button>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const checks = () => Array.from(document.querySelectorAll('.dev-check'));
+            const visibleChecks = () => checks().filter(c => c.closest('tr').style.display !== 'none');
+            const refresh = () => document.getElementById('selCount').textContent = checks().filter(c => c.checked).length;
+
+            document.querySelectorAll('.dev-check').forEach(c => c.addEventListener('change', refresh));
+            document.getElementById('btnSelAll').onclick = () => { visibleChecks().forEach(c => c.checked = true); refresh(); };
+            document.getElementById('btnSelNone').onclick = () => { checks().forEach(c => c.checked = false); refresh(); };
+            document.getElementById('btnSelType').onclick = () => {
+                const t = document.getElementById('typeSelect').value;
+                if (!t) return;
+                checks().forEach(c => { if (c.closest('tr').dataset.type === t) c.checked = true; });
+                refresh();
+            };
+            document.getElementById('deviceFilter').addEventListener('input', function () {
+                const q = this.value.trim().toLowerCase();
+                document.querySelectorAll('#deviceTable tbody tr').forEach(tr => {
+                    tr.style.display = !q || (tr.dataset.search || '').includes(q) ? '' : 'none';
+                });
+            });
+
+            // Analog kanal satırları: ekle / sil, gönderimde indeksler yeniden numaralanır
+            const tbody = document.querySelector('#channelTable tbody');
+            const wire = tr => tr.querySelector('.ch-del').onclick = () => tr.remove();
+            tbody.querySelectorAll('.ch-row').forEach(wire);
+
+            document.getElementById('btnAddCh').onclick = () => {
+                const tr = document.createElement('tr');
+                tr.className = 'ch-row';
+                tr.innerHTML =
+                    '<td><input type="text" required class="form-control form-control-sm" data-f="Channel" /></td>' +
+                    '<td><input type="text" required class="form-control form-control-sm" data-f="Unit" /></td>' +
+                    '<td class="text-center"><input type="checkbox" class="form-check-input" data-f="Send" value="true" />' +
+                    '<input type="hidden" data-f="Send" value="false" /></td>' +
+                    '<td><input type="text" class="form-control form-control-sm" data-f="Measurement" /></td>' +
+                    '<td class="text-center"><button type="button" class="btn btn-outline-danger btn-sm py-0 ch-del">×</button></td>';
+                tbody.appendChild(tr);
+                wire(tr);
+            };
+
+            document.getElementById('publishForm').addEventListener('submit', function (e) {
+                tbody.querySelectorAll('.ch-row').forEach((tr, i) => {
+                    tr.querySelectorAll('[data-f]').forEach(inp => inp.name = 'Config.AnalogChannels[' + i + '].' + inp.dataset.f);
+                });
+                const n = checks().filter(c => c.checked).length;
+                if (n === 0) { e.preventDefault(); alert('En az bir cihaz seçmelisiniz.'); return; }
+                if (!confirm(n + ' cihaza yeni konfigürasyon gönderilecek. Cihazlar bir sonraki kontrolde çekip yeniden başlayacak. Devam edilsin mi?')) e.preventDefault();
+            });
+
+            refresh();
+        });
+    </script>
+}

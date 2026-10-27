@@ -1,7 +1,7 @@
 # Cool Dolly – Kullanıcı Kabul Testi (UAT)
 
 Kaynak: ilk kurulum sonrası müşteri tespitleri (`cool dolly tespit.xlsx`) ve GitHub issue'ları.
-Test edilen sürüm: **v1.0.1**
+Test edilen sürüm: **v1.1.0**
 
 **Ön koşullar**
 - Test kullanıcısı: `DASHBOARD_VIEW`, `DOLLY_VIEW` ve `EXPORT_EXCEL` yetkili (veya Admin).
@@ -102,6 +102,30 @@ Cihazın gönderim aralığı: `______` sn
 | 2 | | | | | |
 | 3 | | | | | |
 
+## 9. Cihaz Konfigürasyonu (uzaktan config)
+
+Ön koşul: Admin kullanıcı; SICK TDC cihazı `Config/Get` çağırabiliyor (API adresi cihazda tanımlı). Admin olmayan bir test kullanıcısı.
+
+| ID | Issue | Adımlar | Beklenen sonuç | Sonuç | Not |
+|---|---|---|---|---|---|
+| K-01 | – | Admin ile giriş yap, menüye bak. | **Cihaz Konfigürasyonu** ve **Konfigürasyon Raporu** menü öğeleri görünür. Admin olmayan kullanıcıda görünmez; adresler doğrudan açılırsa "Erişim Reddedildi" sayfasına yönlenir. | | |
+| K-02 | – | Cihaz Konfigürasyonu sayfasını aç. | Tüm dolly'ler tabloda listelenir (ad, seri no, model, uygulama sürümü, sunucu/uygulanan cfg, durum). Form varsayılan değerlerle (300/1/60/10/60 sn, 3 kanal, 4 endpoint) dolu gelir. | | |
+| K-03 | – | Cihazı hiç seçmeden **Seçili cihazlara gönder**'e tıkla. | "En az bir cihaz seçmelisiniz" uyarısı çıkar, istek gitmez. | | |
+| K-04 | – | **Tümünü seç** / **Temizle** ve arama kutusunu dene. | Seçili sayısı doğru güncellenir; arama yalnızca görünen satırları etkiler. | | |
+| K-05 | – | Cihazı (SICK) açıp `Config/Get`'i çağırmasını bekle (configVersion 0 ile). | Cihaz kaydı oluşur: model ve uygulama sürümü sayfada görünür; cihaz varsayılan config'i **sürüm 1** ile alır. | | |
+| K-06 | – | **Modeli seç** ile bir cihaz modeli seç; sayıyı kontrol et. | Yalnızca o modeldeki cihazlar işaretlenir. | | |
+| K-07 | – | Bir cihazı tek tek işaretle, bir değeri değiştir (örn. gönderim aralığı 30), not yaz ve gönder; onay penceresinde Tamam. | "Konfigürasyon N cihaz için yayınlandı" mesajı çıkar. Cihazın sunucu cfg sürümü 1 artar, durumu **Bekliyor** olur. | | |
+| K-08 | – | Geçersiz değer ver (süre 0, endpoint `/` ile başlamıyor). | Form gönderilmez veya "yayınlanamadı" uyarısı çıkar; sürüm artmaz. | | |
+| K-09 | – | Analog kanal ekle, birini sil, gönder. | Cihaza giden config'te kanal listesi ekranla aynıdır (sıra ve alanlar doğru). | | |
+| K-10 | – | Cihazın gece saatinde `Config/Get`'i çağırmasını bekle (veya elle çağır). | Yeni config yanıtta gelir (`"Konfigürasyon gönderildi"`); Rapor'da olay **Çekildi** görünür. Cihaz uygulayıp yeniden başlar. | | |
+| K-11 | – | Cihaz yeniden başlayıp `Config/GetVsControl` ile bildirimde bulunsun. | Rapor'da cihaz durumu **Uygulandı**, uygulanan cfg = sunucu cfg; olay **Uygulandı** zaman damgasıyla görünür. | | |
+| K-12 | – | Aynı sürümle `Config/Get`'i tekrar çağır. | Yanıt `"Değişiklik yok"`, `config: null`. Rapor'a yeni "Çekildi" olayı eklenmez. | | |
+| K-13 | – | Cihazdan `GetVsControl`'ü `success=false&errorMessage=...` ile çağır. | Rapor'da cihaz **Hata** durumunda, hata metni ve zamanı görünür; hatalı cihazlar tabloda en üstte. Yeni config yayınlanınca hata temizlenir. | | |
+| K-14 | – | Rapor'da cihaz / olay türü / tarih filtreleri ile satır sayısını dene, sayfalarda gez. | Yalnızca eşleşen olaylar gelir; filtreler sayfa değişince korunur; Temizle sıfırlar. Tarihler Türkiye saatindedir. | | |
+| K-15 | – | Var olmayan seri no ile `Config/Get` çağır; `serialNumber` göndermeden de dene. | Var olmayan seri no için 404, eksik alan için 400 döner. | | |
+| K-16 | – | `Config/DollyLog` ile multipart log dosyası yükle. | Başarılı yanıt döner; dosya sunucuda `Logs/DollyLogs/{seriNo}/` altına kaydedilir; Rapor'da **Log yüklendi** olayı görünür. | | |
+| K-17 | – | Config yayını yapıp Denetim Kayıtları'na bak. | Cihaz telemetri güncellemeleri (son görülme vb.) denetim kayıtlarını doldurmaz. | | |
+
 ---
 
 ## Kabul özeti
@@ -116,6 +140,7 @@ Cihazın gönderim aralığı: `______` sn
 | Boş/Dolu | 4 | | | |
 | Denetim Kayıtları | 12 | | | |
 | Sıcaklık doğruluğu | 1 | | | |
+| Cihaz Konfigürasyonu | 17 | | | |
 
 Kabul kararı: ☐ Kabul ☐ Şartlı kabul ☐ Red  
 Onaylayan / tarih: `____________`

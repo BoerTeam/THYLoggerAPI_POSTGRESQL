@@ -37,7 +37,7 @@ public class AuditInterceptor : SaveChangesInterceptor
 
         // Sadece işlem gören gerçek varlıkları filtreliyoruz
         var entries = dbContext.ChangeTracker.Entries()
-            .Where(e => e.Entity is not AuditLog &&
+            .Where(e => e.Entity is not AuditLog && e.Entity is not DollySetting && e.Entity is not DollyConfigEvent &&
                        (e.State == EntityState.Added || e.State == EntityState.Modified || e.State == EntityState.Deleted))
             .ToList();
 

@@ -11,7 +11,10 @@ builder.Services.AddControllersWithViews();
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
     {
-        options.LoginPath = "/Home/Login";
+        // Gelistirmede (DevLogin:Enabled) THY SSO atlanir: yetkisiz istek dogrudan /DevAuth/Login ile admin girisi yapar
+        options.LoginPath = builder.Environment.IsDevelopment() && builder.Configuration.GetValue<bool>("DevLogin:Enabled")
+            ? "/DevAuth/Login"
+            : "/Home/Login";
         options.AccessDeniedPath = "/Home/AccessDenied";
         options.ExpireTimeSpan = TimeSpan.FromHours(8);
         options.SlidingExpiration = true;

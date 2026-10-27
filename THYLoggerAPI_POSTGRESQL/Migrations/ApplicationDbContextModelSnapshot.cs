@@ -105,6 +105,9 @@ namespace THYLoggerAPI_POSTGRESQL.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<string>("PanoNo")
+                        .HasColumnType("text");
+
                     b.Property<string>("SerialNumber")
                         .IsRequired()
                         .HasColumnType("text");
@@ -112,6 +115,41 @@ namespace THYLoggerAPI_POSTGRESQL.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Dolly");
+                });
+
+            modelBuilder.Entity("THYLoggerAPI_POSTGRESQL.Model.DollyConfigEvent", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<int?>("ConfigVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<int>("DollyId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Message")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("DollyId", "CreatedAt");
+
+                    b.ToTable("DollyConfigEvents", (string)null);
                 });
 
             modelBuilder.Entity("THYLoggerAPI_POSTGRESQL.Model.DollyRequest", b =>
@@ -195,6 +233,65 @@ namespace THYLoggerAPI_POSTGRESQL.Migrations
                     b.HasIndex("FlightNumber", "FlightDate");
 
                     b.ToTable("DollyRequests");
+                });
+
+            modelBuilder.Entity("THYLoggerAPI_POSTGRESQL.Model.DollySetting", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AppVersion")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTime?>("AppliedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<int?>("AppliedConfigVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ConfigJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<int>("ConfigVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("DeviceType")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<int>("DollyId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("FetchedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<int?>("FetchedConfigVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTime?>("LastErrorAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<DateTime?>("LastSeenAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DollyId")
+                        .IsUnique();
+
+                    b.ToTable("DollySettings", (string)null);
                 });
 
             modelBuilder.Entity("THYLoggerAPI_POSTGRESQL.Model.Gpsdatum", b =>
@@ -368,7 +465,7 @@ namespace THYLoggerAPI_POSTGRESQL.Migrations
                         {
                             Id = 1,
                             Code = "DollyView",
-                            CreatedAt = new DateTime(2026, 10, 21, 8, 7, 7, 598, DateTimeKind.Utc).AddTicks(5426),
+                            CreatedAt = new DateTime(2026, 10, 27, 8, 50, 23, 670, DateTimeKind.Utc).AddTicks(5574),
                             IsActive = true,
                             Name = "Dolly Görüntüleme"
                         },
@@ -376,7 +473,7 @@ namespace THYLoggerAPI_POSTGRESQL.Migrations
                         {
                             Id = 2,
                             Code = "DollyEdit",
-                            CreatedAt = new DateTime(2026, 10, 21, 8, 7, 7, 598, DateTimeKind.Utc).AddTicks(6666),
+                            CreatedAt = new DateTime(2026, 10, 27, 8, 50, 23, 670, DateTimeKind.Utc).AddTicks(7396),
                             IsActive = true,
                             Name = "Dolly Düzenleme"
                         },
@@ -384,7 +481,7 @@ namespace THYLoggerAPI_POSTGRESQL.Migrations
                         {
                             Id = 3,
                             Code = "ExportExcel",
-                            CreatedAt = new DateTime(2026, 10, 21, 8, 7, 7, 598, DateTimeKind.Utc).AddTicks(6671),
+                            CreatedAt = new DateTime(2026, 10, 27, 8, 50, 23, 670, DateTimeKind.Utc).AddTicks(7401),
                             IsActive = true,
                             Name = "Excel Çıktısı Alma"
                         },
@@ -392,7 +489,7 @@ namespace THYLoggerAPI_POSTGRESQL.Migrations
                         {
                             Id = 4,
                             Code = "UserManagement",
-                            CreatedAt = new DateTime(2026, 10, 21, 8, 7, 7, 598, DateTimeKind.Utc).AddTicks(6672),
+                            CreatedAt = new DateTime(2026, 10, 27, 8, 50, 23, 670, DateTimeKind.Utc).AddTicks(7403),
                             IsActive = true,
                             Name = "Kullanıcı Yönetimi"
                         });
@@ -437,7 +534,7 @@ namespace THYLoggerAPI_POSTGRESQL.Migrations
                         new
                         {
                             Id = 1,
-                            CreatedAt = new DateTime(2026, 10, 21, 8, 7, 7, 597, DateTimeKind.Utc).AddTicks(7404),
+                            CreatedAt = new DateTime(2026, 10, 27, 8, 50, 23, 669, DateTimeKind.Utc).AddTicks(2648),
                             IsActive = true,
                             IsSystemRole = false,
                             Name = "Admin"
@@ -445,7 +542,7 @@ namespace THYLoggerAPI_POSTGRESQL.Migrations
                         new
                         {
                             Id = 2,
-                            CreatedAt = new DateTime(2026, 10, 21, 8, 7, 7, 597, DateTimeKind.Utc).AddTicks(8764),
+                            CreatedAt = new DateTime(2026, 10, 27, 8, 50, 23, 669, DateTimeKind.Utc).AddTicks(4715),
                             IsActive = true,
                             IsSystemRole = false,
                             Name = "User"
@@ -453,7 +550,7 @@ namespace THYLoggerAPI_POSTGRESQL.Migrations
                         new
                         {
                             Id = 3,
-                            CreatedAt = new DateTime(2026, 10, 21, 8, 7, 7, 597, DateTimeKind.Utc).AddTicks(8769),
+                            CreatedAt = new DateTime(2026, 10, 27, 8, 50, 23, 669, DateTimeKind.Utc).AddTicks(4724),
                             IsActive = true,
                             IsSystemRole = false,
                             Name = "SahaOperatoru"
@@ -629,12 +726,34 @@ namespace THYLoggerAPI_POSTGRESQL.Migrations
                     b.Navigation("Dolly");
                 });
 
+            modelBuilder.Entity("THYLoggerAPI_POSTGRESQL.Model.DollyConfigEvent", b =>
+                {
+                    b.HasOne("THYLoggerAPI_POSTGRESQL.Model.Dolly", "Dolly")
+                        .WithMany()
+                        .HasForeignKey("DollyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Dolly");
+                });
+
             modelBuilder.Entity("THYLoggerAPI_POSTGRESQL.Model.DollyRequest", b =>
                 {
                     b.HasOne("THYLoggerAPI_POSTGRESQL.Model.Dolly", "Dolly")
                         .WithMany()
                         .HasForeignKey("DollyId")
                         .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Dolly");
+                });
+
+            modelBuilder.Entity("THYLoggerAPI_POSTGRESQL.Model.DollySetting", b =>
+                {
+                    b.HasOne("THYLoggerAPI_POSTGRESQL.Model.Dolly", "Dolly")
+                        .WithMany()
+                        .HasForeignKey("DollyId")
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("Dolly");

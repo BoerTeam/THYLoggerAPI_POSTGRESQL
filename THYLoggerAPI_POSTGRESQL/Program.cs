@@ -45,6 +45,7 @@ builder.Services.AddScoped<SicaklikService>();
 builder.Services.AddScoped<LatestService>();
 builder.Services.AddScoped<AuditLogService>();
 builder.Services.AddScoped<CoolDollyRequestService>();
+builder.Services.AddScoped<ConfigService>();
 
 // BPM entegrasyonu: Rate limit (servis mapping dokümaný, bölüm 9: dakikada 100 istek)
 builder.Services.AddRateLimiter(options =>
@@ -172,6 +173,22 @@ using (var scope = app.Services.CreateScope())
             context.Pages.Add(new Page { Name = "Dolly Talepleri", Route = "/DollyRequest/Index", PermissionCode = "DOLLY_VIEW", Icon = "list", Order = nextOrder });
             context.SaveChanges();
             Console.WriteLine("--> Dolly Talepleri menü sayfasý eklendi.");
+        }
+
+        // 8. Cihaz Konfigurasyonu ve Rapor menü sayfalarý (yalnýzca Admin)
+        foreach (var (name, route, icon) in new[]
+        {
+            ("Cihaz Konfigürasyonu", "/Config/Index", "settings"),
+            ("Konfigürasyon Raporu", "/Config/Report", "activity")
+        })
+        {
+            if (!context.Pages.Any(p => p.Route == route))
+            {
+                var nextOrder = context.Pages.Any() ? context.Pages.Max(p => p.Order) + 1 : 1;
+                context.Pages.Add(new Page { Name = name, Route = route, PermissionCode = "AdminOnly", Icon = icon, Order = nextOrder });
+                context.SaveChanges();
+                Console.WriteLine($"--> {name} menü sayfasý eklendi.");
+            }
         }
 
         Console.WriteLine("--> Veritabaný, migrasyonlar ve varsayýlan veriler baþarýyla kontrol edildi.");

@@ -1,0 +1,208 @@
+@model Dashboard.DTO.ConfigReportViewModel
+@using Dashboard.DTO
+
+@{
+    ViewData["Title"] = "Konfigürasyon Raporu";
+    var f = Model.Filter;
+    var items = Model.Devices.Items;
+    var totalPages = Math.Max(1, (int)Math.Ceiling(Model.Events.Total / (double)f.PageSize));
+
+    string PageUrl(int p) => Url.Action("Report", "Config", new
+    {
+        dollyId = f.DollyId,
+        eventType = f.EventType,
+        start = f.Start?.ToString("yyyy-MM-ddTHH:mm"),
+        end = f.End?.ToString("yyyy-MM-ddTHH:mm"),
+        pageSize = f.PageSize,
+        page = p
+    })!;
+
+    string Dt(DateTime? d) => d.HasValue ? d.Value.ToString("dd.MM.yyyy HH:mm:ss") : "-";
+
+    var summary = new (string Status, string Title)[]
+    {
+        ("Applied", "Uygulandı"), ("Fetched", "Çekildi"), ("Pending", "Bekliyor"),
+        ("Error", "Hata"), ("NeverSeen", "Hiç bağlanmadı"), ("NoConfig", "Config yok")
+    };
+}
+
+<link rel="stylesheet" href="~/app-assets/vendors/css/pickers/flatpickr/flatpickr.min.css" />
+
+<div class="container-fluid mt-4">
+    @if (Model.ApiError)
+    {
+        <div class="alert alert-danger p-1">Rapor verisi API'den alınamadı.</div>
+    }
+
+    <div class="row g-1 mb-2">
+        @foreach (var s in summary)
+        {
+            <div class="col-6 col-md-2">
+                <div class="card shadow-sm mb-0">
+                    <div class="card-body p-1 text-center">
+                        <div class="h3 mb-0">@items.Count(i => i.Status == s.Status)</div>
+                        <span class="badge @ConfigStatusText.Badge(s.Status)">@s.Title</span>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    <div class="card shadow-sm mb-2">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0 text-white">Cihaz Durumları</h5>
+            <span class="badge bg-light text-dark">Toplam: @items.Count</span>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover table-bordered align-middle table-sm">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Ad</th>
+                            <th>Seri No</th>
+                            <th>Model</th>
+                            <th>Uygulama</th>
+                            <th>Sunucu cfg</th>
+                            <th>Çekilen cfg / zaman</th>
+                            <th>Uygulanan cfg / zaman</th>
+                            <th>Son görülme</th>
+                            <th>Durum</th>
+                            <th>Son hata</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var d in items.OrderByDescending(i => i.Status == "Error").ThenBy(i => i.Name))
+                        {
+                            <tr>
+                                <td>@d.Name</td>
+                                <td>@d.SerialNumber</td>
+                                <td>@(d.DeviceType ?? "-")</td>
+                                <td>@(d.AppVersion ?? "-")</td>
+                                <td>@(d.ServerConfigVersion?.ToString() ?? "-")</td>
+                                <td class="text-nowrap">@(d.FetchedConfigVersion?.ToString() ?? "-") <span class="small text-muted">@Dt(d.FetchedAt)</span></td>
+                                <td class="text-nowrap">@(d.AppliedConfigVersion?.ToString() ?? "-") <span class="small text-muted">@Dt(d.AppliedAt)</span></td>
+                                <td class="text-nowrap">@Dt(d.LastSeenAt)</td>
+                                <td><span class="badge @ConfigStatusText.Badge(d.Status)">@ConfigStatusText.Label(d.Status)</span></td>
+                                <td>
+                                    @if (d.LastError != null)
+                                    {
+                                        <span class="text-danger small">@d.LastError</span>
+                                        <div class="small text-muted">@Dt(d.LastErrorAt)</div>
+                                    }
+                                    else { <span>-</span> }
+                                </td>
+                            </tr>
+                        }
+                        @if (!items.Any())
+                        {
+                            <tr><td colspan="10" class="text-center text-muted">Cihaz bulunamadı.</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0 text-white">Olay Geçmişi</h5>
+            <span class="badge bg-light text-dark">Toplam: @Model.Events.Total</span>
+        </div>
+        <div class="card-body">
+            <form method="get" asp-action="Report" asp-controller="Config" class="row g-2 mb-3 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label small fw-bold mb-0">Cihaz</label>
+                    <select name="dollyId" class="form-select form-select-sm">
+                        <option value="">Tümü</option>
+                        @foreach (var d in items.OrderBy(i => i.Name))
+                        {
+                            <option value="@d.DollyId" selected="@(d.DollyId == f.DollyId)">@d.Name (@d.SerialNumber)</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold mb-0">Olay</label>
+                    <select name="eventType" class="form-select form-select-sm">
+                        <option value="">Tümü</option>
+                        @foreach (var t in new[] { "Published", "Fetched", "Applied", "Error", "LogUploaded" })
+                        {
+                            <option value="@t" selected="@(t == f.EventType)">@ConfigStatusText.EventLabel(t)</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold mb-0">Başlangıç</label>
+                    <input type="text" name="start" class="form-control form-control-sm cfg-datetime" value="@f.Start?.ToString("yyyy-MM-ddTHH:mm")" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold mb-0">Bitiş</label>
+                    <input type="text" name="end" class="form-control form-control-sm cfg-datetime" value="@f.End?.ToString("yyyy-MM-ddTHH:mm")" />
+                </div>
+                <div class="col-md-1">
+                    <label class="form-label small fw-bold mb-0">Satır</label>
+                    <select name="pageSize" class="form-select form-select-sm">
+                        @foreach (var s in new[] { 25, 50, 100, 200 })
+                        {
+                            <option value="@s" selected="@(s == f.PageSize)">@s</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-auto">
+                    <button type="submit" class="btn btn-primary btn-sm">Filtrele</button>
+                    <a asp-action="Report" asp-controller="Config" class="btn btn-outline-secondary btn-sm">Temizle</a>
+                </div>
+            </form>
+
+            <div class="table-responsive">
+                <table class="table table-hover table-bordered align-middle table-sm">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width:150px">Tarih (TR)</th>
+                            <th>Cihaz</th>
+                            <th>Seri No</th>
+                            <th>Olay</th>
+                            <th>cfg</th>
+                            <th>Mesaj</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var e in Model.Events.Items)
+                        {
+                            <tr>
+                                <td class="text-nowrap">@e.CreatedAt.ToString("dd.MM.yyyy HH:mm:ss")</td>
+                                <td>@e.DollyName</td>
+                                <td>@e.SerialNumber</td>
+                                <td><span class="badge @ConfigStatusText.EventBadge(e.EventType)">@ConfigStatusText.EventLabel(e.EventType)</span></td>
+                                <td>@(e.ConfigVersion?.ToString() ?? "-")</td>
+                                <td class="@(e.EventType == "Error" ? "text-danger" : "")">@e.Message</td>
+                            </tr>
+                        }
+                        @if (!Model.Events.Items.Any())
+                        {
+                            <tr><td colspan="6" class="text-center text-muted">Kayıt bulunamadı.</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <nav class="d-flex justify-content-between align-items-center">
+                <span class="small text-muted">Sayfa @f.Page / @totalPages</span>
+                <ul class="pagination pagination-sm mb-0">
+                    <li class="page-item @(f.Page <= 1 ? "disabled" : "")"><a class="page-link" href="@PageUrl(f.Page - 1)">Önceki</a></li>
+                    <li class="page-item @(f.Page >= totalPages ? "disabled" : "")"><a class="page-link" href="@PageUrl(f.Page + 1)">Sonraki</a></li>
+                </ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            flatpickr('.cfg-datetime', {
+                enableTime: true, time_24hr: true, altInput: true, altFormat: 'd/m/Y H:i',
+                dateFormat: 'Y-m-d\\TH:i', locale: { firstDayOfWeek: 1 }, static: true, allowInput: false
+            });
+        });
+    </script>
+}
