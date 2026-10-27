@@ -104,7 +104,7 @@ Cihazın gönderim aralığı: `______` sn
 
 ## 9. Cihaz Konfigürasyonu (uzaktan config)
 
-Ön koşul: Admin kullanıcı; SICK TDC cihazı `Config/Get` çağırabiliyor (API adresi cihazda tanımlı). Admin olmayan bir test kullanıcısı.
+Ön koşul: Admin kullanıcı; SICK TDC cihazı `Config/Get` çağırabiliyor (API adresi cihazda tanımlı). Admin olmayan bir test kullanıcısı. Veritabanında `Migrations/Scripts/AddDollySettings.sql` çalıştırılmış olmalı (EF migration geçmişi yoksa; aksi halde Dolly listesi `PanoNo` hatası verir).
 
 | ID | Issue | Adımlar | Beklenen sonuç | Sonuç | Not |
 |---|---|---|---|---|---|
@@ -125,6 +125,7 @@ Cihazın gönderim aralığı: `______` sn
 | K-15 | – | Var olmayan seri no ile `Config/Get` çağır; `serialNumber` göndermeden de dene. | Var olmayan seri no için 404, eksik alan için 400 döner. | | |
 | K-16 | – | `Config/DollyLog` ile multipart log dosyası yükle. | Başarılı yanıt döner; dosya sunucuda `Logs/DollyLogs/{seriNo}/` altına kaydedilir; Rapor'da **Log yüklendi** olayı görünür. | | |
 | K-17 | – | Config yayını yapıp Denetim Kayıtları'na bak. | Cihaz telemetri güncellemeleri (son görülme vb.) denetim kayıtlarını doldurmaz. | | |
+| K-18 | – | API Swagger sayfasını aç (`/swagger`). | Sayfa hatasız yüklenir (`swagger.json` 200); Config altında Get, GetVsControl, DollyLog, Default, Devices, Publish, Events uçları listelenir. | | |
 
 ---
 
@@ -140,7 +141,7 @@ Cihazın gönderim aralığı: `______` sn
 | Boş/Dolu | 4 | | | |
 | Denetim Kayıtları | 12 | | | |
 | Sıcaklık doğruluğu | 1 | | | |
-| Cihaz Konfigürasyonu | 17 | | | |
+| Cihaz Konfigürasyonu | 18 | | | |
 
 Kabul kararı: ☐ Kabul ☐ Şartlı kabul ☐ Red  
 Onaylayan / tarih: `____________`
