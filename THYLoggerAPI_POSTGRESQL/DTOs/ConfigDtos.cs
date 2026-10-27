@@ -21,6 +21,13 @@ namespace THYLoggerAPI_POSTGRESQL.DTOs
         public string? ErrorMessage { get; set; }
     }
 
+    // Multipart: "LogFile" (dosya) ve "SerialNumber"
+    public class DollyLogRequest
+    {
+        public IFormFile? LogFile { get; set; }
+        public string? SerialNumber { get; set; }
+    }
+
     // Dashboard -> API: seçili cihazlara (ve/veya cihaz modeline) yeni config yayınla
     public class ConfigPublishRequest
     {

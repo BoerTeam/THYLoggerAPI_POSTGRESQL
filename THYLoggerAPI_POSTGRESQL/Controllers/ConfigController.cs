@@ -107,11 +107,11 @@ namespace THYLoggerAPI_POSTGRESQL.Controllers
 
         [HttpPost("DollyLog")]
         [RequestSizeLimit(ConfigService.MaxLogFileBytes + 1024 * 1024)]
-        public async Task<IActionResult> DollyLog([FromForm] IFormFile? logFile, [FromForm] string? serialNumber)
+        public async Task<IActionResult> DollyLog([FromForm] DollyLogRequest request)
         {
             try
             {
-                var result = await _configService.SaveLogAsync(logFile, serialNumber);
+                var result = await _configService.SaveLogAsync(request.LogFile, request.SerialNumber);
                 if (!result.IsSuccess)
                     return result.IsNotFound ? NotFound(result.ErrorMessage) : BadRequest(result.ErrorMessage);
 
