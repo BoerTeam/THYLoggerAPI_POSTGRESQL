@@ -383,7 +383,7 @@ else
                 };
                 const tempOptions = {
                     ...baseOptions,
-                    scales: { ...baseOptions.scales, yAxes: [{ ticks: { min: 0, suggestedMax: 25 } }] }
+                    scales: { ...baseOptions.scales, yAxes: [{ ticks: { min: 0, suggestedMax: 50 } }] }
                 };
 
                 tempChart = new Chart(document.getElementById('tempChart'), {
@@ -554,7 +554,7 @@ else
                                         minRotation: 0
                                     }
                                 }],
-                                yAxes: isTemp ? [{ ticks: { min: 0, suggestedMax: 25 } }] : [{ ticks: { min: 0, max: 100 } }]
+                                yAxes: isTemp ? [{ ticks: { min: 0, suggestedMax: 50 } }] : [{ ticks: { min: 0, max: 100 } }]
                             }
                         }
                     });
