@@ -68,12 +68,11 @@ namespace Dashboard.Controllers
             DateTime filterStart = startDate;
             DateTime filterEnd = endDate;
 
-            // Tarih/dolly filtresi API tarafinda uygulanir (uzun araliklarda tum tabloyu cekmemek icin)
             var rangeParams = new Dictionary<string, string>
-            {
-                { "start", filterStart.ToString("yyyy-MM-ddTHH:mm:ss") },
-                { "end", filterEnd.ToString("yyyy-MM-ddTHH:mm:ss") }
-            };
+    {
+        { "start", filterStart.ToString("yyyy-MM-ddTHH:mm:ss") },
+        { "end", filterEnd.ToString("yyyy-MM-ddTHH:mm:ss") }
+    };
             if (dollyId.HasValue) rangeParams.Add("dollyId", dollyId.Value.ToString());
 
             var tumSicakliklar = await _apiService.GetAsync<List<Sicaklik>>("api/Sicaklik/GetAll", rangeParams) ?? new List<Sicaklik>();
@@ -85,161 +84,112 @@ namespace Dashboard.Controllers
             var dollyDict = tumDollyler.ToDictionary(x => x.Id, x => x.Name);
             var trCulture = new System.Globalization.CultureInfo("tr-TR");
 
-            var filteredSicaklik = tumSicakliklar
-                .Where(x => (!dollyId.HasValue || x.DollyId == dollyId) &&
-                            x.Time.HasValue &&
-                            x.Time.Value >= filterStart &&
-                            x.Time.Value <= filterEnd)
-                .OrderByDescending(x => x.Time)
-                .ToList();
+            // Tüm sensör kayýtlarýný ortak bir listede birleþtiriyoruz
+            var unifiedTelemetryList = new List<UnifiedTelemetryRow>();
 
-            var filteredNem = tumNemler
-                .Where(x => (!dollyId.HasValue || x.DollyId == dollyId) &&
-                            x.Time.HasValue &&
-                            x.Time.Value >= filterStart &&
-                            x.Time.Value <= filterEnd)
-                .OrderByDescending(x => x.Time)
-                .ToList();
+            // 1. Sýcaklýk Verileri
+            unifiedTelemetryList.AddRange(tumSicakliklar
+                .Where(x => (!dollyId.HasValue || x.DollyId == dollyId) && x.Time.HasValue && x.Time.Value >= filterStart && x.Time.Value <= filterEnd)
+                .Select(x => new UnifiedTelemetryRow
+                {
+                    DollyId = x.DollyId,
+                    Time = x.Time!.Value,
+                    SensorType = "Sýcaklýk",
+                    Value = x.Sicaklik1.HasValue ? $"{x.Sicaklik1.Value:0.0} °C" : "-",
+                    Details = "-"
+                }));
 
-            var filteredGps = tumGpsler
-                .Where(x => (!dollyId.HasValue || x.DollyId == dollyId) &&
-                            x.Time.HasValue &&
-                            x.Time.Value >= filterStart &&
-                            x.Time.Value <= filterEnd)
-                .OrderByDescending(x => x.Time)
-                .ToList();
+            // 2. Nem Verileri
+            unifiedTelemetryList.AddRange(tumNemler
+                .Where(x => (!dollyId.HasValue || x.DollyId == dollyId) && x.Time.HasValue && x.Time.Value >= filterStart && x.Time.Value <= filterEnd)
+                .Select(x => new UnifiedTelemetryRow
+                {
+                    DollyId = x.DollyId,
+                    Time = x.Time!.Value,
+                    SensorType = "Nem",
+                    Value = x.Nem1.HasValue ? $"%{x.Nem1.Value:0}" : "-",
+                    Details = "-"
+                }));
+
+            // 3. GPS Verileri
+            unifiedTelemetryList.AddRange(tumGpsler
+                .Where(x => (!dollyId.HasValue || x.DollyId == dollyId) && x.Time.HasValue && x.Time.Value >= filterStart && x.Time.Value <= filterEnd)
+                .Select(x => new UnifiedTelemetryRow
+                {
+                    DollyId = x.DollyId,
+                    Time = x.Time!.Value,
+                    SensorType = "GPS Konum",
+                    Value = $"{x.Latitude}, {x.Longitude}",
+                    Details = $"Enlem: {x.Latitude} | Boylam: {x.Longitude}"
+                }));
+
+            // 4. Boþ/Dolu Durum Verileri
+            unifiedTelemetryList.AddRange(tumDurumlar
+                .Where(x => (!dollyId.HasValue || x.DollyId == dollyId) && x.Time.HasValue && x.Time.Value >= filterStart && x.Time.Value <= filterEnd)
+                .Select(x => new UnifiedTelemetryRow
+                {
+                    DollyId = x.DollyId,
+                    Time = x.Time!.Value,
+                    SensorType = "Boþ / Dolu",
+                    Value = x.SensorDegeri == true ? "Dolu" : "Boþ",
+                    Details = "-"
+                }));
+
+            // Zamana göre yeniden eskiye kronolojik sýralama
+            var sortedTelemetry = unifiedTelemetryList.OrderByDescending(x => x.Time).ToList();
 
             using (var workbook = new XLWorkbook())
             {
-                // 1. Sýcaklýk Sayfasý
-                var wsTemp = workbook.Worksheets.Add("Sýcaklýk Verileri");
-                wsTemp.Cell(1, 1).Value = "Dolly Adý";
-                wsTemp.Cell(1, 2).Value = "Tarih / Saat";
-                wsTemp.Cell(1, 3).Value = "Sýcaklýk (°C)";
+                var ws = workbook.Worksheets.Add("Tüm Telemetri Verileri");
+
+                // Baþlýklar
+                string[] headers = { "Dolly Adý", "Tarih / Saat", "Sensör / Veri Tipi", "Ölçülen Deðer", "Detay / Koordinat" };
+                for (int i = 0; i < headers.Length; i++)
+                {
+                    var cell = ws.Cell(1, i + 1);
+                    cell.Value = headers[i];
+                    cell.Style.Font.Bold = true;
+                    cell.Style.Fill.BackgroundColor = XLColor.FromHtml("#7367F0"); // Kurumsal Mor/Mavi
+                    cell.Style.Font.FontColor = XLColor.White;
+                    cell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                }
 
                 int row = 2;
-                foreach (var item in filteredSicaklik)
+                foreach (var item in sortedTelemetry)
                 {
-                    wsTemp.Cell(row, 1).Value = dollyDict.TryGetValue(item.DollyId, out var name) ? name : item.DollyId.ToString();
-                    if (item.Time.HasValue)
-                    {
-                        var cell = wsTemp.Cell(row, 2);
-                        cell.Value = item.Time.Value.ToString("dd.MM.yyyy HH:mm:ss", trCulture);
-                        cell.Style.NumberFormat.Format = "@";
-                    }
-                    wsTemp.Cell(row, 3).Value = item.Sicaklik1;
+                    ws.Cell(row, 1).Value = dollyDict.TryGetValue(item.DollyId, out var name) ? name : item.DollyId.ToString();
+
+                    var dateCell = ws.Cell(row, 2);
+                    dateCell.Value = item.Time.ToString("dd.MM.yyyy HH:mm:ss", trCulture);
+                    dateCell.Style.NumberFormat.Format = "@";
+
+                    ws.Cell(row, 3).Value = item.SensorType;
+                    ws.Cell(row, 4).Value = item.Value;
+                    ws.Cell(row, 5).Value = item.Details;
+
                     row++;
                 }
-                wsTemp.Columns().AdjustToContents();
 
-                // 2. Nem Sayfasý
-                var wsHum = workbook.Worksheets.Add("Nem Verileri");
-                wsHum.Cell(1, 1).Value = "Dolly Adý";
-                wsHum.Cell(1, 2).Value = "Tarih / Saat";
-                wsHum.Cell(1, 3).Value = "Nem (%)";
-
-                row = 2;
-                foreach (var item in filteredNem)
-                {
-                    wsHum.Cell(row, 1).Value = dollyDict.TryGetValue(item.DollyId, out var name) ? name : item.DollyId.ToString();
-                    if (item.Time.HasValue)
-                    {
-                        var cell = wsHum.Cell(row, 2);
-                        cell.Value = item.Time.Value.ToString("dd.MM.yyyy HH:mm:ss", trCulture);
-                        cell.Style.NumberFormat.Format = "@";
-                    }
-                    wsHum.Cell(row, 3).Value = item.Nem1;
-                    row++;
-                }
-                wsHum.Columns().AdjustToContents();
-
-                // 3. GPS Konum Sayfasý
-                var wsGps = workbook.Worksheets.Add("GPS Konum Verileri");
-                wsGps.Cell(1, 1).Value = "Dolly Adý";
-                wsGps.Cell(1, 2).Value = "Tarih / Saat";
-                wsGps.Cell(1, 3).Value = "Enlem (Lat)";
-                wsGps.Cell(1, 4).Value = "Boylam (Lng)";
-
-                row = 2;
-                foreach (var item in filteredGps)
-                {
-                    wsGps.Cell(row, 1).Value = dollyDict.TryGetValue(item.DollyId, out var name) ? name : item.DollyId.ToString();
-                    if (item.Time.HasValue)
-                    {
-                        var cell = wsGps.Cell(row, 2);
-                        cell.Value = item.Time.Value.ToString("dd.MM.yyyy HH:mm:ss", trCulture);
-                        cell.Style.NumberFormat.Format = "@";
-                    }
-                    wsGps.Cell(row, 3).Value = item.Latitude;
-                    wsGps.Cell(row, 4).Value = item.Longitude;
-                    row++;
-                }
-                wsGps.Columns().AdjustToContents();
-
-                // 4. Bos/Dolu Durum Sayfasi: durum degisimlerine gore aralik bazli ozet
-                var wsState = workbook.Worksheets.Add("Boþ-Dolu Durumu");
-                string[] stateHeaders = { "Dolly Adý", "Baþlangýç", "Bitiþ", "Durum",
-                    "Min Sýcaklýk (°C)", "Ort Sýcaklýk (°C)", "Maks Sýcaklýk (°C)",
-                    "Min Nem (%)", "Ort Nem (%)", "Maks Nem (%)",
-                    "Baþlangýç Enlem", "Baþlangýç Boylam", "Bitiþ Enlem", "Bitiþ Boylam" };
-                for (int c = 0; c < stateHeaders.Length; c++) wsState.Cell(1, c + 1).Value = stateHeaders[c];
-
-                row = 2;
-                foreach (var dollyGroup in tumDurumlar.Where(x => x.Time.HasValue && x.SensorDegeri.HasValue)
-                                                      .GroupBy(x => x.DollyId))
-                {
-                    var changes = new List<(DateTime Start, bool Full)>();
-                    foreach (var d in dollyGroup.OrderBy(x => x.Time))
-                    {
-                        if (changes.Count == 0 || changes[^1].Full != d.SensorDegeri!.Value)
-                            changes.Add((d.Time!.Value, d.SensorDegeri!.Value));
-                    }
-
-                    for (int i = 0; i < changes.Count; i++)
-                    {
-                        var pStart = changes[i].Start;
-                        var pEnd = i + 1 < changes.Count ? changes[i + 1].Start : filterEnd;
-
-                        var temps = filteredSicaklik.Where(x => x.DollyId == dollyGroup.Key && x.Time >= pStart && x.Time < pEnd && x.Sicaklik1.HasValue).Select(x => (double)x.Sicaklik1!.Value).ToList();
-                        var hums = filteredNem.Where(x => x.DollyId == dollyGroup.Key && x.Time >= pStart && x.Time < pEnd && x.Nem1.HasValue).Select(x => (double)x.Nem1!.Value).ToList();
-                        var gps = filteredGps.Where(x => x.DollyId == dollyGroup.Key && x.Time >= pStart && x.Time < pEnd).OrderBy(x => x.Time).ToList();
-
-                        wsState.Cell(row, 1).Value = dollyDict.TryGetValue(dollyGroup.Key, out var dName) ? dName : dollyGroup.Key.ToString();
-                        wsState.Cell(row, 2).Value = pStart.ToString("dd.MM.yyyy HH:mm:ss", trCulture);
-                        wsState.Cell(row, 3).Value = pEnd.ToString("dd.MM.yyyy HH:mm:ss", trCulture);
-                        wsState.Cell(row, 4).Value = changes[i].Full ? "Dolu" : "Boþ";
-                        if (temps.Count > 0)
-                        {
-                            wsState.Cell(row, 5).Value = temps.Min();
-                            wsState.Cell(row, 6).Value = Math.Round(temps.Average(), 2);
-                            wsState.Cell(row, 7).Value = temps.Max();
-                        }
-                        if (hums.Count > 0)
-                        {
-                            wsState.Cell(row, 8).Value = hums.Min();
-                            wsState.Cell(row, 9).Value = Math.Round(hums.Average(), 2);
-                            wsState.Cell(row, 10).Value = hums.Max();
-                        }
-                        if (gps.Count > 0)
-                        {
-                            wsState.Cell(row, 11).Value = gps[0].Latitude;
-                            wsState.Cell(row, 12).Value = gps[0].Longitude;
-                            wsState.Cell(row, 13).Value = gps[^1].Latitude;
-                            wsState.Cell(row, 14).Value = gps[^1].Longitude;
-                        }
-                        row++;
-                    }
-                }
-                wsState.Columns().AdjustToContents();
+                ws.Columns().AdjustToContents();
 
                 using (var stream = new MemoryStream())
                 {
                     workbook.SaveAs(stream);
                     var content = stream.ToArray();
-                    string fileName = $"Dolly_Rapor_{startDate.ToString("yyyyMMdd_HHmm", trCulture)}_{endDate.ToString("yyyyMMdd_HHmm", trCulture)}.xlsx";
+                    string fileName = $"Dolly_Telemetri_Raporu_{startDate.ToString("yyyyMMdd_HHmm", trCulture)}_{endDate.ToString("yyyyMMdd_HHmm", trCulture)}.xlsx";
                     return File(content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
                 }
             }
+        }
+
+        // Ortak liste için yardýmcý model
+        public class UnifiedTelemetryRow
+        {
+            public int DollyId { get; set; }
+            public DateTime Time { get; set; }
+            public string SensorType { get; set; } = string.Empty;
+            public string Value { get; set; } = string.Empty;
+            public string Details { get; set; } = string.Empty;
         }
 
         [HttpGet]
