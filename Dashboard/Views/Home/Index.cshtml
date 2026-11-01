@@ -45,15 +45,20 @@ else
 
                         <div class="card-body" data-field="body" style="background-color: @(sicaklikDegeri <= 25 ? "#28c76f" : "#ea5455"); border-radius: 8px; padding: 1rem;">
                             <h5 class="fw-bolder text-white">@dolly.Name</h5>
+                                
                             <div class="row text-white">
-                                <div class="col-md-6">
+                                <div class="col-md-4">
                                     <small>Sıcaklık</small>
                                     <h6 class="fw-bold" data-field="temp">@(sonSicaklik?.Sicaklik1?.ToString("0.0") ?? "0")°C</h6>
                                 </div>
-                                <div class="col-md-6">
+                                <div class="col-md-4">
                                     <small>Nem</small>
                                     <h6 class="fw-bold" data-field="nem">%@(sonNem?.Nem1?.ToString("0") ?? "0")</h6>
                                 </div>
+                                <div class="col-md-4">
+                             <span class="badge @(sonDurum?.SensorDegeri == true ? "bg-warning text-dark" : "bg-light text-dark") fw-bold" data-field="status-badge" style="font-size: 0.75rem;">
+                                    @(sonDurum?.SensorDegeri == true ? "DOLU" : "BOŞ")
+                                </span></div>
                             </div>
                             <div class="text-white mt-1 pt-1" style="border-top: 1px solid rgba(255,255,255,.4); font-size: .8rem;">
                                 <div>ULD: <b data-field="uld">@uldText</b></div>
