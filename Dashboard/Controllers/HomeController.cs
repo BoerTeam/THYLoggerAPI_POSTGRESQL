@@ -56,7 +56,6 @@ namespace Dashboard.Controllers
 
             return View(multiModel);
         }
-
         [HttpGet]
         public async Task<IActionResult> ExportToExcel(int? dollyId, DateTime startDate, DateTime endDate)
         {
@@ -84,78 +83,71 @@ namespace Dashboard.Controllers
             var dollyDict = tumDollyler.ToDictionary(x => x.Id, x => x.Name);
             var trCulture = new System.Globalization.CultureInfo("tr-TR");
 
-            // Tüm sensör kayýtlarýný ortak bir listede birleþtiriyoruz
-            var unifiedTelemetryList = new List<UnifiedTelemetryRow>();
+            // Tüm zaman damgalarýný toplayýp gruplamak için geçici liste
+            var rawList = new List<(int DollyId, DateTime Time, double? Temp, double? Hum, double? Lat, double? Lng, bool? IsFull)>();
 
-            // 1. Sýcaklýk Verileri
-            unifiedTelemetryList.AddRange(tumSicakliklar
+            // 1. Sýcaklýklar
+            rawList.AddRange(tumSicakliklar
                 .Where(x => (!dollyId.HasValue || x.DollyId == dollyId) && x.Time.HasValue && x.Time.Value >= filterStart && x.Time.Value <= filterEnd)
-                .Select(x => new UnifiedTelemetryRow
-                {
-                    DollyId = x.DollyId,
-                    Time = x.Time!.Value,
-                    SensorType = "Sýcaklýk",
-                    Value = x.Sicaklik1.HasValue ? $"{x.Sicaklik1.Value:0.0} °C" : "-",
-                    Details = "-"
-                }));
+                .Select(x => (x.DollyId, x.Time!.Value, (double?)x.Sicaklik1, (double?)null, (double?)null, (double?)null, (bool?)null)));
 
-            // 2. Nem Verileri
-            unifiedTelemetryList.AddRange(tumNemler
+            // 2. Nemler
+            rawList.AddRange(tumNemler
                 .Where(x => (!dollyId.HasValue || x.DollyId == dollyId) && x.Time.HasValue && x.Time.Value >= filterStart && x.Time.Value <= filterEnd)
-                .Select(x => new UnifiedTelemetryRow
-                {
-                    DollyId = x.DollyId,
-                    Time = x.Time!.Value,
-                    SensorType = "Nem",
-                    Value = x.Nem1.HasValue ? $"%{x.Nem1.Value:0}" : "-",
-                    Details = "-"
-                }));
+                .Select(x => (x.DollyId, x.Time!.Value, (double?)null, (double?)x.Nem1, (double?)null, (double?)null, (bool?)null)));
 
-            // 3. GPS Verileri
-            unifiedTelemetryList.AddRange(tumGpsler
+            // 3. GPS
+            rawList.AddRange(tumGpsler
                 .Where(x => (!dollyId.HasValue || x.DollyId == dollyId) && x.Time.HasValue && x.Time.Value >= filterStart && x.Time.Value <= filterEnd)
-                .Select(x => new UnifiedTelemetryRow
-                {
-                    DollyId = x.DollyId,
-                    Time = x.Time!.Value,
-                    SensorType = "GPS Konum",
-                    Value = $"{x.Latitude}, {x.Longitude}",
-                    Details = $"Enlem: {x.Latitude} | Boylam: {x.Longitude}"
-                }));
+                .Select(x => (x.DollyId, x.Time!.Value, (double?)null, (double?)null, (double?)x.Latitude, (double?)x.Longitude, (bool?)null)));
 
-            // 4. Boþ/Dolu Durum Verileri
-            unifiedTelemetryList.AddRange(tumDurumlar
+            // 4. Boþ / Dolu
+            rawList.AddRange(tumDurumlar
                 .Where(x => (!dollyId.HasValue || x.DollyId == dollyId) && x.Time.HasValue && x.Time.Value >= filterStart && x.Time.Value <= filterEnd)
-                .Select(x => new UnifiedTelemetryRow
-                {
-                    DollyId = x.DollyId,
-                    Time = x.Time!.Value,
-                    SensorType = "Boþ / Dolu",
-                    Value = x.SensorDegeri == true ? "Dolu" : "Boþ",
-                    Details = "-"
-                }));
+                .Select(x => (x.DollyId, x.Time!.Value, (double?)null, (double?)null, (double?)null, (double?)null, (bool?)x.SensorDegeri)));
 
-            // Zamana göre yeniden eskiye kronolojik sýralama
-            var sortedTelemetry = unifiedTelemetryList.OrderByDescending(x => x.Time).ToList();
+            // Zaman eþleþmelerini birleþtirmek için Dolly + Zaman bazlý gruplama
+            // Not: Farklý sensörler arasýnda birkaç saniyelik kayma varsa zamaný saniyeden arýndýrarak (örn. yyyy-MM-dd HH:mm:ss) gruplayabilirsiniz.
+            DateTime TrimMilliseconds(DateTime dt) => new DateTime(dt.Year, dt.Month, dt.Day, dt.Hour, dt.Minute, dt.Second);
+
+            var groupedTelemetry = rawList
+                .GroupBy(x => new
+                {
+                    x.DollyId,
+                    // Milisaniyeleri sýfýrlayarak grupluyoruz (Sadece Yýl-Ay-Gün Saat:Dakika:Saniye)
+                    TrimmedTime = new DateTime(x.Time.Year, x.Time.Month, x.Time.Day, x.Time.Hour, x.Time.Minute, x.Time.Second)
+                })
+                .Select(g => new
+                {
+                    g.Key.DollyId,
+                    Time = g.Key.TrimmedTime,
+                    Temp = g.FirstOrDefault(x => x.Temp.HasValue).Temp,
+                    Hum = g.FirstOrDefault(x => x.Hum.HasValue).Hum,
+                    Lat = g.FirstOrDefault(x => x.Lat.HasValue).Lat,
+                    Lng = g.FirstOrDefault(x => x.Lng.HasValue).Lng,
+                    IsFull = g.FirstOrDefault(x => x.IsFull.HasValue).IsFull
+                })
+                .OrderByDescending(x => x.Time)
+                .ToList();
 
             using (var workbook = new XLWorkbook())
             {
-                var ws = workbook.Worksheets.Add("Tüm Telemetri Verileri");
+                var ws = workbook.Worksheets.Add("Telemetri Verileri");
 
                 // Baþlýklar
-                string[] headers = { "Dolly Adý", "Tarih / Saat", "Sensör / Veri Tipi", "Ölçülen Deðer", "Detay / Koordinat" };
+                string[] headers = { "Dolly Adý", "Tarih / Saat", "Sýcaklýk (°C)", "Nem (%)", "Enlem (Lat)", "Boylam (Lng)", "Boþ / Dolu" };
                 for (int i = 0; i < headers.Length; i++)
                 {
                     var cell = ws.Cell(1, i + 1);
                     cell.Value = headers[i];
                     cell.Style.Font.Bold = true;
-                    cell.Style.Fill.BackgroundColor = XLColor.FromHtml("#7367F0"); // Kurumsal Mor/Mavi
+                    cell.Style.Fill.BackgroundColor = XLColor.FromHtml("#7367F0");
                     cell.Style.Font.FontColor = XLColor.White;
                     cell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
                 }
 
                 int row = 2;
-                foreach (var item in sortedTelemetry)
+                foreach (var item in groupedTelemetry)
                 {
                     ws.Cell(row, 1).Value = dollyDict.TryGetValue(item.DollyId, out var name) ? name : item.DollyId.ToString();
 
@@ -163,9 +155,12 @@ namespace Dashboard.Controllers
                     dateCell.Value = item.Time.ToString("dd.MM.yyyy HH:mm:ss", trCulture);
                     dateCell.Style.NumberFormat.Format = "@";
 
-                    ws.Cell(row, 3).Value = item.SensorType;
-                    ws.Cell(row, 4).Value = item.Value;
-                    ws.Cell(row, 5).Value = item.Details;
+                    // Deðerler yan yana yazýlýyor
+                    if (item.Temp.HasValue) ws.Cell(row, 3).Value = item.Temp.Value;
+                    if (item.Hum.HasValue) ws.Cell(row, 4).Value = item.Hum.Value;
+                    if (item.Lat.HasValue) ws.Cell(row, 5).Value = item.Lat.Value;
+                    if (item.Lng.HasValue) ws.Cell(row, 6).Value = item.Lng.Value;
+                    if (item.IsFull.HasValue) ws.Cell(row, 7).Value = item.IsFull.Value ? "Dolu" : "Boþ";
 
                     row++;
                 }
