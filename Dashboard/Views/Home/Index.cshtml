@@ -24,11 +24,11 @@ else
                 var sonNem = Model.nem.Where(x => x.DollyId == dolly.Id).OrderByDescending(x => x.Time).FirstOrDefault();
                 var sonDurum = Model.bosDolu.Where(x => x.DollyId == dolly.Id).OrderByDescending(x => x.Time).FirstOrDefault();
                 var sonGps = Model.gpsdatum.Where(x => x.DollyId == dolly.Id).OrderByDescending(x => x.Time).FirstOrDefault();
-                // Dolly'nin içindeki (açık talepteki) ULD No ve SCC bilgileri
-var dollyOpen = Model.OpenRequests.Where(x => x.DollyId == dolly.Id).ToList();
-string uldText = dollyOpen.Count > 0 ? string.Join(", ", dollyOpen.Select(x => x.UldNo)) : "-";
-var sccList = dollyOpen.Where(x => !string.IsNullOrEmpty(x.SccCode)).Select(x => x.SccCode).Distinct().ToList();
-string sccText = sccList.Count > 0 ? string.Join(", ", sccList) : "-";
+
+                var dollyOpen = Model.OpenRequests.Where(x => x.DollyId == dolly.Id).ToList();
+                string uldText = dollyOpen.Count > 0 ? string.Join(", ", dollyOpen.Select(x => x.UldNo)) : "-";
+                var sccList = dollyOpen.Where(x => !string.IsNullOrEmpty(x.SccCode)).Select(x => x.SccCode).Distinct().ToList();
+                string sccText = sccList.Count > 0 ? string.Join(", ", sccList) : "-";
                 double sicaklikDegeri = sonSicaklik?.Sicaklik1 ?? 0;
 
                 string latVal = sonGps?.Latitude?.ToString(CultureInfo.InvariantCulture) ?? "";
@@ -56,9 +56,9 @@ string sccText = sccList.Count > 0 ? string.Join(", ", sccList) : "-";
                                 </div>
                             </div>
                             <div class="text-white mt-1 pt-1" style="border-top: 1px solid rgba(255,255,255,.4); font-size: .8rem;">
-    <div>ULD: <b data-field="uld">@uldText</b></div>
-    <div>SCC: <b data-field="scc">@sccText</b></div>
-</div>
+                                <div>ULD: <b data-field="uld">@uldText</b></div>
+                                <div>SCC: <b data-field="scc">@sccText</b></div>
+                            </div>
                             <small class="d-block text-white mt-1" style="opacity:.8" data-field="updated">@(sonSicaklik?.Time?.ToString("dd.MM.yyyy HH:mm:ss") ?? "-")</small>
                         </div>
                     </div>
@@ -67,8 +67,37 @@ string sccText = sccList.Count > 0 ? string.Join(", ", sccList) : "-";
         </div>
 
         <style>
-            .map-location-label { background: rgba(255,255,255,.85); border: 0; box-shadow: none; font-weight: 600; font-size: 11px; padding: 1px 4px; }
-            .map-labels-hidden .map-location-label { display: none; }
+                .map-location-label {
+                    background: rgba(255,255,255,.85);
+                    border: 0;
+                    box-shadow: none;
+                    font-weight: 600;
+                    font-size: 11px;
+                    padding: 1px 4px;
+                }
+
+                .map-labels-hidden .map-location-label {
+                    display: none;
+                }
+
+                /* Tıklanabilir Yakınlaştırma Kartları */
+                .zoomable-card {
+                    cursor: pointer;
+                    transition: transform 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+                }
+
+                    .zoomable-card:hover {
+                        transform: translateY(-2px);
+                        box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+                    }
+
+                .zoom-badge {
+                    font-size: 0.7rem;
+                    padding: 2px 6px;
+                    border-radius: 4px;
+                    background-color: #7367f0;
+                    color: #fff;
+                }
         </style>
 
         <!-- Dolly Detay Modal -->
@@ -95,7 +124,6 @@ string sccText = sccList.Count > 0 ? string.Join(", ", sccList) : "-";
                             <div class="col-md-8">
                                 @if (User.HasClaim("Permission", "DOLLY_VIEW") || User.IsInRole("Admin"))
                                 {
-                                    <!-- Excel Rapor Filtre Formu (Tarih ve Saat Seçimli) -->
                                     <form action="/Home/ExportToExcel" method="get" class="row gx-2 align-items-center justify-content-end">
                                         <input type="hidden" name="dollyId" id="modalDollyIdInput" value="" />
 
@@ -120,7 +148,7 @@ string sccText = sccList.Count > 0 ? string.Join(", ", sccList) : "-";
                             </div>
                         </div>
 
-                        <!-- Grafik zaman araligi secimi -->
+                        <!-- Grafik Zaman Aralığı Seçimi -->
                         <div class="d-flex flex-wrap align-items-center gap-2 mb-2" id="chartRangeBar">
                             <span class="small fw-bold">Grafik Aralığı:</span>
                             <div class="btn-group btn-group-sm" role="group">
@@ -137,24 +165,33 @@ string sccText = sccList.Count > 0 ? string.Join(", ", sccList) : "-";
                         <!-- Grafikler ve Harita -->
                         <div class="row">
                             <div class="col-md-4">
-                                <div class="card shadow-none border">
-                                    <div class="card-header"><h4 class="card-title">Nem (%) </h4></div>
+                                <div class="card shadow-none border zoomable-card" onclick="openZoomModal('hum')">
+                                    <div class="card-header d-flex justify-content-between align-items-center">
+                                        <h4 class="card-title mb-0">Nem (%)</h4>
+                                        <span class="zoom-badge">🔍 Büyüt</span>
+                                    </div>
                                     <div class="card-body" style="position: relative; height:250px;">
                                         <canvas id="humidityChart"></canvas>
                                     </div>
                                 </div>
                             </div>
                             <div class="col-md-4">
-                                <div class="card shadow-none border">
-                                    <div class="card-header"><h4 class="card-title">Sıcaklık (°C) </h4></div>
+                                <div class="card shadow-none border zoomable-card" onclick="openZoomModal('temp')">
+                                    <div class="card-header d-flex justify-content-between align-items-center">
+                                        <h4 class="card-title mb-0">Sıcaklık (°C)</h4>
+                                        <span class="zoom-badge">🔍 Büyüt</span>
+                                    </div>
                                     <div class="card-body" style="position: relative; height:250px;">
                                         <canvas id="tempChart"></canvas>
                                     </div>
                                 </div>
                             </div>
                             <div class="col-md-4">
-                                <div class="card shadow-none border">
-                                    <div class="card-header"><h4 class="card-title">Konum</h4></div>
+                                <div class="card shadow-none border zoomable-card" onclick="openZoomModal('map')">
+                                    <div class="card-header d-flex justify-content-between align-items-center">
+                                        <h4 class="card-title mb-0">Konum</h4>
+                                        <span class="zoom-badge">🔍 Büyüt</span>
+                                    </div>
                                     <div class="card-body">
                                         <div id="basic-map" style="height: 250px; width: 100%; border-radius: 8px;"></div>
                                     </div>
@@ -166,6 +203,28 @@ string sccText = sccList.Count > 0 ? string.Join(", ", sccList) : "-";
                 </div>
             </div>
         </div>
+
+        <!-- Grafik & Harita Detay Büyütme Modalı (Pop-Up) -->
+        <div class="modal fade" id="zoomModal" tabindex="-1" aria-hidden="true" style="z-index: 1060;">
+            <div class="modal-dialog modal-dialog-centered modal-xl" style="max-width: 90vw;">
+                <div class="modal-content">
+                    <div class="modal-header d-flex justify-content-between align-items-center">
+                        <h4 class="modal-title" id="zoomModalTitle">Grafik Detayı</h4>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body p-3">
+                        <!-- Büyük Grafik Container -->
+                        <div id="zoomChartWrapper" style="position: relative; height: 60vh; width: 100%; display: none;">
+                            <canvas id="zoomChart"></canvas>
+                        </div>
+                        <!-- Büyük Harita Container -->
+                        <div id="zoomMapWrapper" style="height: 60vh; width: 100%; display: none; border-radius: 8px;">
+                            <div id="zoom-map" style="height: 100%; width: 100%; border-radius: 8px;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </section>
 
     @section Scripts {
@@ -173,13 +232,13 @@ string sccText = sccList.Count > 0 ? string.Join(", ", sccList) : "-";
         <script>
 
             let map, marker, tempChart, humChart;
+            let zoomChartInstance = null;
+            let zoomMap = null, zoomMarker = null;
 
-            // --- Grafik verisini secilen aralik icin sunucudan getir ---
             const pad2 = n => n.toString().padStart(2, '0');
             const toIso = d => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}:00`;
             let chartStartPicker, chartEndPicker;
 
-            // Saat secimi olan flatpickr takvimi kendiliginden kapanmaz; "Tamam" butonu ve disina tiklayinca kapanma ekler
             function wirePickerClosing(pickers) {
                 const list = [].concat(pickers);
                 list.forEach(fp => {
@@ -197,7 +256,6 @@ string sccText = sccList.Count > 0 ? string.Join(", ", sccList) : "-";
                 }, true);
             }
 
-            // Modal acikken aria-hidden="true" kalirsa odaklanan alanlar icin tarayici uyarisi olusur; acikken temizle
             document.addEventListener('DOMContentLoaded', function () {
                 const m = document.getElementById('xlargeModal');
                 new MutationObserver(() => {
@@ -235,13 +293,29 @@ string sccText = sccList.Count > 0 ? string.Join(", ", sccList) : "-";
                         const hm = `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
                         return longRange ? `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)} ${hm}` : hm;
                     };
-                    tempChart.data.labels = data.temps.map(x => label(x.t));
-                    tempChart.data.datasets[0].data = data.temps.map(x => x.v);
+
+                    const tempLabels = data.temps.map(x => label(x.t));
+                    const tempData = data.temps.map(x => x.v);
+                    const humLabels = data.hums.map(x => label(x.t));
+                    const humData = data.hums.map(x => x.v);
+
+                    tempChart.data.labels = tempLabels;
+                    tempChart.data.datasets[0].data = tempData;
                     tempChart.update();
-                    humChart.data.labels = data.hums.map(x => label(x.t));
-                    humChart.data.datasets[0].data = data.hums.map(x => x.v);
+
+                    humChart.data.labels = humLabels;
+                    humChart.data.datasets[0].data = humData;
                     humChart.update();
+
                     info.textContent = data.temps.length + ' sıcaklık, ' + data.hums.length + ' nem kaydı';
+
+                    // Eğer büyütülmüş grafik modali açıksa onu da anlık güncelle
+                    if (zoomChartInstance) {
+                        const isTemp = zoomChartInstance.data.datasets[0].label.includes('Sıcaklık');
+                        zoomChartInstance.data.labels = isTemp ? tempLabels : humLabels;
+                        zoomChartInstance.data.datasets[0].data = isTemp ? tempData : humData;
+                        zoomChartInstance.update();
+                    }
                 } catch (e) {
                     info.textContent = 'Veri alınamadı';
                 }
@@ -273,11 +347,10 @@ string sccText = sccList.Count > 0 ? string.Join(", ", sccList) : "-";
             });
 
             document.addEventListener("DOMContentLoaded", function () {
-                // Tarih gösterimi Gün/Ay/Yıl (gönderilen değer ISO kalır)
                 const excelPickers = flatpickr('.excel-datetime', {
                     enableTime: true,
                     time_24hr: true,
-                                minuteIncrement: 1,
+                    minuteIncrement: 1,
                     altInput: true,
                     altFormat: 'd/m/Y H:i',
                     dateFormat: 'Y-m-d\TH:i',
@@ -288,12 +361,21 @@ string sccText = sccList.Count > 0 ? string.Join(", ", sccList) : "-";
             });
 
             document.addEventListener("DOMContentLoaded", function () {
-                // Layout'taki Chart.js v2.9.3 sozdizimi: Y ekseni sabit (nem 0-100, sicaklik en az 0-25; deger tasarsa genisler)
+                // Ticks autoSkip: true ve maxTicksLimit verilerek saat yazılarının üst üste binmesi engellendi
                 const baseOptions = {
                     responsive: true,
                     maintainAspectRatio: false,
-                    elements: { point: { radius: 0, hitRadius: 6 } },
-                    scales: { xAxes: [{ ticks: { maxTicksLimit: 12, maxRotation: 0 } }] }
+                    elements: { point: { radius: 1, hitRadius: 8 } },
+                    scales: {
+                        xAxes: [{
+                            ticks: {
+                                autoSkip: true,
+                                maxTicksLimit: 10,
+                                maxRotation: 0,
+                                minRotation: 0
+                            }
+                        }]
+                    }
                 };
                 const humOptions = {
                     ...baseOptions,
@@ -343,8 +425,6 @@ string sccText = sccList.Count > 0 ? string.Join(", ", sccList) : "-";
 
                 const modalEl = document.getElementById('xlargeModal');
                 modalEl.addEventListener('shown.bs.modal', function () {
-                    const id = parseInt(this.getAttribute('data-current-id'));
-
                     loadCharts({ hours: 24 });
 
                     setTimeout(() => {
@@ -378,10 +458,10 @@ string sccText = sccList.Count > 0 ? string.Join(", ", sccList) : "-";
                                 maxZoom: 16,
                                 maxBounds: mapTileBounds,
                                 maxBoundsViscosity: 0.8,
-                scrollWheelZoom: true,   // fare tekerlegi ile zoom
-                zoomSnap: 0.25,
-                zoomDelta: 0.5,
-                wheelPxPerZoomLevel: 90
+                                scrollWheelZoom: true,
+                                zoomSnap: 0.25,
+                                zoomDelta: 0.5,
+                                wheelPxPerZoomLevel: 90
                             });
 
                             L.tileLayer('/map/files/{z}/{x}/{y}png.tile', {
@@ -392,12 +472,10 @@ string sccText = sccList.Count > 0 ? string.Join(", ", sccList) : "-";
 
                             marker = L.marker([lat, lng]).addTo(map);
 
-                            // 449 pozisyon etiketi dusuk zoomda kalabalik yaptigi icin sadece yakinlasinca gosterilir
                             const toggleLabels = () => map.getContainer().classList.toggle('map-labels-hidden', map.getZoom() < 15);
                             map.on('zoomend', toggleLabels);
                             toggleLabels();
 
-                            // Sabit lokasyonlar (wwwroot/map/locations.json); koordinati bos olanlar atlanir
                             const currentMap = map;
                             fetch('/map/locations.json')
                                 .then(r => r.json())
@@ -405,7 +483,7 @@ string sccText = sccList.Count > 0 ? string.Join(", ", sccList) : "-";
                                     if (map !== currentMap) return;
                                     const style = { color: loc.color || '#7367f0', weight: 2, fillOpacity: 0.15 };
                                     let shape;
-                                    if (loc.bounds) shape = L.rectangle(loc.bounds, style);          // [[y1,x1],[y2,x2]]
+                                    if (loc.bounds) shape = L.rectangle(loc.bounds, style);
                                     else if (loc.lat != null && loc.lng != null) shape = L.circle([loc.lat, loc.lng], { ...style, radius: loc.radius || 100 });
                                     else return;
                                     shape.addTo(currentMap)
@@ -422,23 +500,131 @@ string sccText = sccList.Count > 0 ? string.Join(", ", sccList) : "-";
                                 offset: [0, -32]
                             }).openTooltip();
 
-                            const bounds = L.latLngBounds([
-                                [lat - 0.01, lng - 0.01],
-                                [lat + 0.01, lng + 0.01]
-                            ]);
-
-                            if (!bounds.contains(L.latLng(lat, lng))) {
-                                alert("⚠️ UYARI: Belirlenen güvenli alanın dışındasınız!");
-                                marker.bindPopup(`<b style='color:red;'>Alan Dışı Konum!</b><br>Lat: ${lat}<br>Lng: ${lng}`).openPopup();
-                            }
-
                             setTimeout(() => { map.invalidateSize(); }, 200);
                         }
                     }, 300);
                 });
             });
 
-            // --- Canli guncelleme (sayfa yenilemeden) ---
+            // --- Grafik ve Harita Büyütme (Pop-Up) Fonksiyonu ---
+            function openZoomModal(type) {
+                const zoomModalEl = document.getElementById('zoomModal');
+                const titleEl = document.getElementById('zoomModalTitle');
+                const chartWrapper = document.getElementById('zoomChartWrapper');
+                const mapWrapper = document.getElementById('zoomMapWrapper');
+
+                chartWrapper.style.display = 'none';
+                mapWrapper.style.display = 'none';
+
+                const dollyName = document.getElementById('modalDolyName').innerText;
+
+                if (type === 'hum' || type === 'temp') {
+                    chartWrapper.style.display = 'block';
+                    const isTemp = type === 'temp';
+                    const targetChart = isTemp ? tempChart : humChart;
+
+                    titleEl.innerText = `${dollyName} - ${isTemp ? 'Sıcaklık Grafiği Detayı (°C)' : 'Nem Grafiği Detayı (%)'}`;
+
+                    if (zoomChartInstance) zoomChartInstance.destroy();
+
+                    const ctx = document.getElementById('zoomChart').getContext('2d');
+                    zoomChartInstance = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: [...targetChart.data.labels],
+                            datasets: [{
+                                label: targetChart.data.datasets[0].label,
+                                borderColor: targetChart.data.datasets[0].borderColor,
+                                backgroundColor: targetChart.data.datasets[0].backgroundColor,
+                                data: [...targetChart.data.datasets[0].data],
+                                fill: true,
+                                tension: 0.3
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            elements: { point: { radius: 2, hitRadius: 10 } },
+                            scales: {
+                                xAxes: [{
+                                    ticks: {
+                                        autoSkip: true,
+                                        maxTicksLimit: 24,
+                                        maxRotation: 0,
+                                        minRotation: 0
+                                    }
+                                }],
+                                yAxes: isTemp ? [{ ticks: { min: 0, suggestedMax: 25 } }] : [{ ticks: { min: 0, max: 100 } }]
+                            }
+                        }
+                    });
+
+                } else if (type === 'map') {
+                    mapWrapper.style.display = 'block';
+                    titleEl.innerText = `${dollyName} - Konum Detayı`;
+
+                    const modalEl = document.getElementById('xlargeModal');
+                    let rawLat = modalEl.getAttribute('data-current-lat');
+                    let rawLng = modalEl.getAttribute('data-current-lng');
+
+                    if (rawLat && rawLng && rawLat !== "0") {
+                        const lat = parseFloat(rawLat.trim().replace(/\s+/g, '.').replace(',', '.'));
+                        const lng = parseFloat(rawLng.trim().replace(/\s+/g, '.').replace(',', '.'));
+
+                        setTimeout(() => {
+                            if (zoomMap) { zoomMap.remove(); zoomMap = null; }
+
+                            const mapTileBounds = L.latLngBounds(
+                                L.latLng(41.1800, 28.6200),
+                                L.latLng(41.3600, 28.8500)
+                            );
+
+                            zoomMap = L.map('zoom-map', {
+                                center: [lat, lng],
+                                zoom: 15,
+                                minZoom: 12,
+                                maxZoom: 16,
+                                maxBounds: mapTileBounds,
+                                maxBoundsViscosity: 0.8,
+                                scrollWheelZoom: true
+                            });
+
+                            L.tileLayer('/map/files/{z}/{x}/{y}png.tile', {
+                                minZoom: 12,
+                                maxZoom: 16,
+                                attribution: 'Offline Harita'
+                            }).addTo(zoomMap);
+
+                            zoomMarker = L.marker([lat, lng]).addTo(zoomMap);
+                            zoomMarker.bindTooltip(`<b>${dollyName}</b><br>${lat.toFixed(5)}, ${lng.toFixed(5)}`, {
+                                permanent: true,
+                                direction: 'top',
+                                offset: [0, -32]
+                            }).openTooltip();
+
+                            // Sabit Poligonlar/Lokasyonlar
+                            fetch('/map/locations.json')
+                                .then(r => r.json())
+                                .then(locs => locs.forEach(loc => {
+                                    const style = { color: loc.color || '#7367f0', weight: 2, fillOpacity: 0.15 };
+                                    let shape;
+                                    if (loc.bounds) shape = L.rectangle(loc.bounds, style);
+                                    else if (loc.lat != null && loc.lng != null) shape = L.circle([loc.lat, loc.lng], { ...style, radius: loc.radius || 100 });
+                                    else return;
+                                    shape.addTo(zoomMap)
+                                        .bindTooltip(loc.name, { permanent: true, direction: 'center', className: 'map-location-label' });
+                                }))
+                                .catch(() => { });
+
+                            zoomMap.invalidateSize();
+                        }, 200);
+                    }
+                }
+
+                bootstrap.Modal.getOrCreateInstance(zoomModalEl).show();
+            }
+
+            // --- Canlı Güncelleme ---
             async function refreshCards() {
                 try {
                     const res = await fetch('/Home/GetLatestAll', { cache: 'no-store' });
@@ -446,12 +632,12 @@ string sccText = sccList.Count > 0 ? string.Join(", ", sccList) : "-";
                     const list = await res.json();
                     if (!Array.isArray(list)) return;
                     const gelenIdler = new Set(list.map(d => d.dollyId));
-document.querySelectorAll('.doly-card').forEach(card => {
-    if (!gelenIdler.has(parseInt(card.getAttribute('data-dolly-id')))) {
-        const u = card.querySelector('[data-field="uld"]'); if (u) u.textContent = '-';
-        const s = card.querySelector('[data-field="scc"]'); if (s) s.textContent = '-';
-    }
-});
+                    document.querySelectorAll('.doly-card').forEach(card => {
+                        if (!gelenIdler.has(parseInt(card.getAttribute('data-dolly-id')))) {
+                            const u = card.querySelector('[data-field="uld"]'); if (u) u.textContent = '-';
+                            const s = card.querySelector('[data-field="scc"]'); if (s) s.textContent = '-';
+                        }
+                    });
                     const modalEl = document.getElementById('xlargeModal');
                     const modalOpen = modalEl.classList.contains('show');
                     const openId = parseInt(modalEl.getAttribute('data-current-id'));
@@ -470,10 +656,10 @@ document.querySelectorAll('.doly-card').forEach(card => {
                         card.querySelector('[data-field="nem"]').textContent = `%${Math.round(d.nem ?? 0)}`;
                         card.querySelector('[data-field="updated"]').textContent = d.updated ?? '-';
                         const uldEl = card.querySelector('[data-field="uld"]');
-if (uldEl) uldEl.textContent = d.uldNo || '-';
-const sccEl = card.querySelector('[data-field="scc"]');
-if (sccEl) sccEl.textContent = d.sccCode || '-';
-                        // Detay penceresi bu dolly icin aciksa onu da guncelle
+                        if (uldEl) uldEl.textContent = d.uldNo || '-';
+                        const sccEl = card.querySelector('[data-field="scc"]');
+                        if (sccEl) sccEl.textContent = d.sccCode || '-';
+
                         if (modalOpen && openId === d.dollyId) {
                             modalEl.setAttribute('data-current-lat', d.lat ?? '');
                             modalEl.setAttribute('data-current-lng', d.lng ?? '');
@@ -486,6 +672,12 @@ if (sccEl) sccEl.textContent = d.sccCode || '-';
                                 marker.setPopupContent(`<b>Konum Koordinatları:</b><br>Lat: ${d.lat}<br>Lng: ${d.lng}`);
                                 if (!map.getBounds().contains(ll)) map.panTo(ll);
                             }
+
+                            if (zoomMarker && zoomMap && d.lat != null && d.lng != null) {
+                                const ll = L.latLng(d.lat, d.lng);
+                                zoomMarker.setLatLng(ll);
+                                zoomMarker.setTooltipContent(`<b>${document.getElementById('modalDolyName').innerText}</b><br>${d.lat.toFixed(5)}, ${d.lng.toFixed(5)}`);
+                            }
                         }
                     });
                 } catch (e) { /* bir sonraki turda tekrar denenir */ }
@@ -493,7 +685,6 @@ if (sccEl) sccEl.textContent = d.sccCode || '-';
 
             setInterval(refreshCards, 5000);
 
-            // Detay penceresi aciksa ve hazir aralik seciliyse grafikleri de tazele
             setInterval(function () {
                 if (document.querySelector('.modal.show') && currentRange) loadCharts(currentRange);
             }, 30000);
