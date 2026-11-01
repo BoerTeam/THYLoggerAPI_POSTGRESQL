@@ -247,7 +247,27 @@ namespace THYLoggerAPI_POSTGRESQL.Services
 
             return item;
         }
+        public async Task<DollyRequestListItem?> GetBySerialNumberAsync(string serialNumber)
+        {
+            _logger.LogInformation("Dolly talebi aranıyor. SerialNumber: {SerialNumber}", serialNumber);
 
+            var findID = await _context.Dolly.AsNoTracking()
+                .Where(r => r.SerialNumber == serialNumber)
+                .Select(r => r.Id)
+                .FirstOrDefaultAsync();
+
+            var item = await _context.DollyRequests.AsNoTracking()
+                .Where(r => r.Id == findID)
+                .Select(ToListItem)
+                .FirstOrDefaultAsync();
+
+            if (item == null)
+            {
+                _logger.LogWarning("Dolly talebi bulunamadı. SerialNumber: {SerialNumber}", serialNumber);
+            }
+
+            return item;
+        }
         /// <summary>Bir Dolly'nin içinde şu an bulunan (açık) ULD/AWB kayıtları.</summary>
         public async Task<List<DollyRequestListItem>> GetOpenByDollyAsync(int dollyId)
         {

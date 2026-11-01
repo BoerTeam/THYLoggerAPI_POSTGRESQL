@@ -52,7 +52,24 @@ namespace THYLoggerAPI_POSTGRESQL.Controllers
                 return StatusCode(500, "Dolly talebi alınırken bir hata oluştu: " + ex.Message);
             }
         }
+        [HttpGet("GetBySerialNumber/{serialNumber}")]
+        public async Task<IActionResult> GetBySerialNumber(string serialNumber)
+        {
+            try
+            {
+                var item = await _service.GetBySerialNumberAsync(serialNumber);
+                if (item == null)
+                {
+                    return NotFound("Dolly talebi bulunamadı.");
+                }
 
+                return Ok(item);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, "Dolly talebi alınırken bir hata oluştu: " + ex.Message);
+            }
+        }
         // Ana ekran kartları için: tüm Dolly'lerin içindeki açık ULD/AWB/SCC kayıtları
         [HttpGet("GetOpen")]
         public async Task<IActionResult> GetOpen()
