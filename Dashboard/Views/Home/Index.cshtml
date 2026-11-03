@@ -43,7 +43,7 @@ else
                          data-lng="@lngVal"
                          data-status="@(sonDurum?.SensorDegeri == true ? "true" : "false")">
 
-                        <div class="card-body" data-field="body" style="background-color: @(sicaklikDegeri <= 25 ? "#28c76f" : "#ea5455"); border-radius: 8px; padding: 1rem;">
+                        <div class="card-body" data-field="body" style="background-color: @(sonSicaklik?.Sicaklik1 == null ? "#b3b3b3" : (sicaklikDegeri <= 25 ? "#28c76f" : "#ea5455")); border-radius: 8px; padding: 1rem;">
                             <h5 class="fw-bolder text-white">@dolly.Name</h5>
                                 
                             <div class="row text-white">
@@ -655,15 +655,28 @@ else
                         card.setAttribute('data-lng', d.lng ?? '');
                         card.setAttribute('data-status', d.isFull ? 'true' : 'false');
 
-                        const temp = d.sicaklik ?? 0;
-                        card.querySelector('[data-field="body"]').style.backgroundColor = temp <= 25 ? '#28c76f' : '#ea5455';
-                        card.querySelector('[data-field="temp"]').textContent = `${temp.toFixed(1).replace(',', '.')}°C`;
-                        card.querySelector('[data-field="nem"]').textContent = `%${Math.round(d.nem ?? 0)}`;
-                        card.querySelector('[data-field="updated"]').textContent = d.updated ?? '-';
-                        const uldEl = card.querySelector('[data-field="uld"]');
-                        if (uldEl) uldEl.textContent = d.uldNo || '-';
-                        const sccEl = card.querySelector('[data-field="scc"]');
-                        if (sccEl) sccEl.textContent = d.sccCode || '-';
+                                   const hasTemp = d.sicaklik !== null && d.sicaklik !== undefined;
+            const temp = hasTemp ? Number(d.sicaklik) : null;
+
+            // 1. Arka plan rengi (Veri yoksa GRI, varsa sıcaklık kontrolü)
+            card.querySelector('[data-field="body"]').style.backgroundColor =
+                !hasTemp ? '#b3b3b3' : (temp <= 25 ? '#28c76f' : '#ea5455');
+
+            // 2. Sıcaklık metni (Veri yoksa "-", varsa "X.X°C")
+            card.querySelector('[data-field="temp"]').textContent =
+                hasTemp ? `${temp.toFixed(1).replace(',', '.')}°C` : '-';
+
+            // 3. Diğer alanlar
+            card.querySelector('[data-field="nem"]').textContent =
+                (d.nem !== null && d.nem !== undefined) ? `%${Math.round(d.nem)}` : '%-';
+
+            card.querySelector('[data-field="updated"]').textContent = d.updated ?? '-';
+
+            const uldEl = card.querySelector('[data-field="uld"]');
+            if (uldEl) uldEl.textContent = d.uldNo || '-';
+
+            const sccEl = card.querySelector('[data-field="scc"]');
+            if (sccEl) sccEl.textContent = d.sccCode || '-';
 
                         if (modalOpen && openId === d.dollyId) {
                             modalEl.setAttribute('data-current-lat', d.lat ?? '');
