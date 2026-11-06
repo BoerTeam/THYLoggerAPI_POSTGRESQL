@@ -384,11 +384,11 @@ else
                 };
                 const humOptions = {
                     ...baseOptions,
-                    scales: { ...baseOptions.scales, yAxes: [{ ticks: { min: 0, max: 100 } }] }
+                    scales: { ...baseOptions.scales, yAxes: [{ ticks: { min: -10, max: 100 } }] }
                 };
                 const tempOptions = {
                     ...baseOptions,
-                    scales: { ...baseOptions.scales, yAxes: [{ ticks: { min: 0, suggestedMax: 50 } }] }
+                    scales: { ...baseOptions.scales, yAxes: [{ ticks: { min: -10, suggestedMax: 50 } }] }
                 };
 
                 tempChart = new Chart(document.getElementById('tempChart'), {
@@ -559,7 +559,7 @@ else
                                         minRotation: 0
                                     }
                                 }],
-                                yAxes: isTemp ? [{ ticks: { min: 0, suggestedMax: 50 } }] : [{ ticks: { min: 0, max: 100 } }]
+                                yAxes: isTemp ? [{ ticks: { min: -10, suggestedMax: 50 } }] : [{ ticks: { min: -10, max: 100 } }]
                             }
                         }
                     });
