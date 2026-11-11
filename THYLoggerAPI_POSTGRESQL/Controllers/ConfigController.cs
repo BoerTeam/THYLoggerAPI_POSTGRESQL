@@ -122,5 +122,34 @@ namespace THYLoggerAPI_POSTGRESQL.Controllers
                 return StatusCode(500, "Log kaydedilirken bir hata oluştu: " + ex.Message);
             }
         }
+
+        // Multipart: "ImageFile" (imaj.tar) -> Images/ dizinine kaydedilir; Get yanıtındaki getLastImageName güncellenir
+        [HttpPost("UploadImage")]
+        [RequestSizeLimit(ConfigService.MaxImageFileBytes + 1024 * 1024)]
+        [RequestFormLimits(MultipartBodyLengthLimit = ConfigService.MaxImageFileBytes + 1024 * 1024)]
+        public async Task<IActionResult> UploadImage([FromForm] UploadImageRequest request)
+        {
+            try
+            {
+                var result = await _configService.SaveImageAsync(request.ImageFile);
+                if (!result.IsSuccess) return BadRequest(result.ErrorMessage);
+
+                return Ok(new { message = "İmaj dosyası alındı", fileName = result.FileName });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, "İmaj kaydedilirken bir hata oluştu: " + ex.Message);
+            }
+        }
+
+        // GET: api/Config/DownloadImage?fileName=... (cihaz, getLastImageName ile gelen adı buraya verir)
+        [HttpGet("DownloadImage")]
+        public IActionResult DownloadImage([FromQuery] string? fileName)
+        {
+            var path = _configService.ResolveImagePath(fileName);
+            if (path == null) return NotFound("İmaj dosyası bulunamadı.");
+
+            return PhysicalFile(path, "application/x-tar", Path.GetFileName(path), enableRangeProcessing: true);
+        }
     }
 }
