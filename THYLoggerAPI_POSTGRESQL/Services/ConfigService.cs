@@ -9,6 +9,7 @@ namespace THYLoggerAPI_POSTGRESQL.Services
     public class ConfigService
     {
         public const long MaxLogFileBytes = 20 * 1024 * 1024;
+        public const long MaxImageFileBytes = 2L * 1024 * 1024 * 1024;
 
         private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -106,7 +107,8 @@ namespace THYLoggerAPI_POSTGRESQL.Services
                 {
                     Message = "Değişiklik yok",
                     ConfigVersion = setting.ConfigVersion,
-                    Config = null
+                    Config = null,
+                    GetLastImageName = GetLastImageName()
                 });
             }
 
@@ -114,7 +116,8 @@ namespace THYLoggerAPI_POSTGRESQL.Services
             {
                 Message = "Konfigürasyon gönderildi",
                 ConfigVersion = setting.ConfigVersion,
-                Config = JsonSerializer.Deserialize<DeviceConfig>(setting.ConfigJson, JsonOptions)
+                Config = JsonSerializer.Deserialize<DeviceConfig>(setting.ConfigJson, JsonOptions),
+                GetLastImageName = GetLastImageName()
             });
         }
 
@@ -197,6 +200,69 @@ namespace THYLoggerAPI_POSTGRESQL.Services
 
             _logger.LogInformation("Dolly log dosyası kaydedildi. SerialNumber: {SerialNumber}, Dosya: {FileName}", serialNumber, fileName);
             return (true, false, null, fileName);
+        }
+
+        // ==========================================
+        // İMAJ (Images/ dizini)
+        // ==========================================
+
+        private string ImagesDir => Path.Combine(_env.ContentRootPath, "Images");
+
+        /// <summary>Images/ içindeki en son yüklenen .tar dosyasının adı; yoksa null.</summary>
+        public string? GetLastImageName()
+        {
+            if (!Directory.Exists(ImagesDir)) return null;
+            return new DirectoryInfo(ImagesDir).EnumerateFiles("*.tar")
+                .OrderByDescending(f => f.LastWriteTimeUtc)
+                .Select(f => f.Name)
+                .FirstOrDefault();
+        }
+
+        /// <summary>İmaj .tar dosyasını Images/ altına yazar; aynı adla ezilmesin diye zaman damgası öneki eklenir.</summary>
+        public async Task<(bool IsSuccess, string? ErrorMessage, string? FileName)> SaveImageAsync(IFormFile? imageFile)
+        {
+            if (imageFile == null || imageFile.Length == 0)
+                return (false, "ImageFile zorunludur.", null);
+            if (imageFile.Length > MaxImageFileBytes)
+                return (false, "ImageFile en fazla 2 GB olabilir.", null);
+
+            // Dosya adı kullanıcı girdisinden geldiği için path traversal'a karşı temizlenir
+            var safeName = Path.GetFileName(imageFile.FileName);
+            if (string.IsNullOrWhiteSpace(safeName) || !safeName.EndsWith(".tar", StringComparison.OrdinalIgnoreCase))
+                return (false, "ImageFile bir .tar dosyası olmalıdır.", null);
+
+            var fileName = $"{TurkeyNow():yyyyMMdd_HHmmss}_{safeName}";
+            Directory.CreateDirectory(ImagesDir);
+
+            // Yarım yüklenen dosya "son imaj" olarak görünmesin diye önce .part'a yazılıp sonra taşınır
+            var finalPath = Path.Combine(ImagesDir, fileName);
+            var tempPath = finalPath + ".part";
+            try
+            {
+                await using (var stream = File.Create(tempPath))
+                {
+                    await imageFile.CopyToAsync(stream);
+                }
+                File.Move(tempPath, finalPath, true);
+            }
+            finally
+            {
+                if (File.Exists(tempPath)) File.Delete(tempPath);
+            }
+
+            _logger.LogInformation("İmaj dosyası kaydedildi: {FileName} ({Size} bayt)", fileName, imageFile.Length);
+            return (true, null, fileName);
+        }
+
+        /// <summary>İndirilecek imajın tam yolunu döner (yalnızca Images/ içindeki .tar dosyaları).</summary>
+        public string? ResolveImagePath(string? fileName)
+        {
+            if (string.IsNullOrWhiteSpace(fileName)) return null;
+            var safeName = Path.GetFileName(fileName);
+            if (safeName != fileName || !safeName.EndsWith(".tar", StringComparison.OrdinalIgnoreCase)) return null;
+
+            var path = Path.Combine(ImagesDir, safeName);
+            return File.Exists(path) ? path : null;
         }
 
         // ==========================================

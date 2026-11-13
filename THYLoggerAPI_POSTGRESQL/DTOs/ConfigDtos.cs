@@ -28,6 +28,12 @@ namespace THYLoggerAPI_POSTGRESQL.DTOs
         public string? SerialNumber { get; set; }
     }
 
+    // Multipart: "ImageFile" (imaj.tar)
+    public class UploadImageRequest
+    {
+        public IFormFile? ImageFile { get; set; }
+    }
+
     // Dashboard -> API: seçili cihazlara (ve/veya cihaz modeline) yeni config yayınla
     public class ConfigPublishRequest
     {
@@ -102,6 +108,9 @@ namespace THYLoggerAPI_POSTGRESQL.DTOs
         public string Message { get; set; } = string.Empty;
         public int ConfigVersion { get; set; }
         public DeviceConfig? Config { get; set; }
+
+        // Sunucudaki en güncel imaj dosyasının adı (yoksa null); cihaz /Config/DownloadImage ile indirir
+        public string? GetLastImageName { get; set; }
     }
 
     public class DeviceConfig
