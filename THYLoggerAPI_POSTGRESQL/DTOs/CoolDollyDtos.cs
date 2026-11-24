@@ -1,15 +1,13 @@
-﻿using THYLoggerAPI_POSTGRESQL.Model;
+﻿using System.Text.Json.Serialization;
+using THYLoggerAPI_POSTGRESQL.Model;
 
 namespace THYLoggerAPI_POSTGRESQL.DTOs
 {
     // ==========================================================
-    // BPM -> Cool Dolly (servis mapping dokümanı, bölüm 4)
-    //
-    // NOT: Tüm alanlar bilerek "string?" tanımlandı. Projede Nullable=enable olduğu için
-    // non-nullable string'ler [ApiController] tarafından otomatik "required" sayılır ve
-    // eksik alanda BPM'in beklediği formatta değil, ProblemDetails formatında 400 dönerdi.
-    // Doğrulamayı serviste yapıp CD-xxx kodlu cevap dönüyoruz.
+    // BPM -> Cool Dolly (Servis Mapping Dokümanı v1.1, Bölüm 4)
     // ==========================================================
+
+    // Doküman Bölüm 4.1: Create Request (9 alan)
     public class CreateCoolDollyRequestDto
     {
         public string? OperationType { get; set; }      // INBOUND / OUTBOUND
@@ -23,34 +21,61 @@ namespace THYLoggerAPI_POSTGRESQL.DTOs
         public string? CoolDollyNumber { get; set; }    // max 20
     }
 
+    // Doküman Bölüm 4.3: Update Request (Create alanları + requestReferenceNo)
+    public class UpdateCoolDollyRequestDto
+    {
+        public string? OperationType { get; set; }
+        public string? AwbNumber { get; set; }
+        public string? FlightNumber { get; set; }
+        public string? FlightDate { get; set; }
+        public string? DepartureStation { get; set; }
+        public string? ArrivalStation { get; set; }
+        public string? SccCode { get; set; }
+        public string? UldNumber { get; set; }
+        public string? CoolDollyNumber { get; set; }
+        public string? RequestReferenceNo { get; set; }
+    }
+
+    // Doküman Bölüm 4.2: Terminate Request (6 alan)
     public class TerminateCoolDollyRequestDto
     {
         public string? OperationType { get; set; }
         public string? RequestReferenceNo { get; set; }
+        public string? UldNumber { get; set; }
         public string? FlightNumber { get; set; }
         public string? FlightDate { get; set; }
         public string? CoolDollyNumber { get; set; }
     }
 
-    // Doküman bölüm 6: status / message / referenceNumber / timestamp
+    // Doküman Bölüm 6.1 & 6.2: Standart Response
     public class CoolDollyResponse
     {
         public string Status { get; set; } = "SUCCESS";
         public string Message { get; set; } = string.Empty;
+        public string? UldNumber { get; set; }
         public string? ReferenceNumber { get; set; }
         public DateTime Timestamp { get; set; } = DateTime.UtcNow;
 
-        public static CoolDollyResponse Success(string message, string referenceNumber) => new()
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? ErrorCode { get; set; }
+
+        public static CoolDollyResponse Success(string message, string? uldNumber, string referenceNumber) => new()
         {
             Status = "SUCCESS",
             Message = message,
-            ReferenceNumber = referenceNumber
+            UldNumber = uldNumber,
+            ReferenceNumber = referenceNumber,
+            Timestamp = DateTime.UtcNow
         };
 
-        public static CoolDollyResponse Error(string code, string message) => new()
+        public static CoolDollyResponse Error(string code, string message, string? uldNumber = null, string? referenceNumber = null) => new()
         {
             Status = "ERROR",
-            Message = $"{code}: {message}"
+            Message = message,
+            UldNumber = uldNumber,
+            ReferenceNumber = referenceNumber,
+            ErrorCode = code,
+            Timestamp = DateTime.UtcNow
         };
     }
 

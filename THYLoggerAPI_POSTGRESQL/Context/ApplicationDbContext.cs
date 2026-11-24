@@ -189,7 +189,6 @@ namespace THYLoggerAPI_POSTGRESQL.Context
             // ==========================================
             // DOLLY REQUEST (BPM -> Cool Dolly talepleri)
             // ==========================================
-
             modelBuilder.Entity<DollyRequest>(builder =>
             {
                 builder.HasKey(x => x.Id);
@@ -209,11 +208,12 @@ namespace THYLoggerAPI_POSTGRESQL.Context
                 builder.HasIndex(x => x.UldNumber);
                 builder.HasIndex(x => new { x.FlightNumber, x.FlightDate });
 
-                // Bir Dolly'nin aynı anda yalnızca 1 açık talebi olabilir (CD-002'nin DB seviyesinde garantisi)
-                builder.HasIndex(x => x.DollyId)
+                // Bir ULD'nin aynı anda yalnızca 1 açık talebi olabilir (KR-04 / CD-003 DB garantisi).
+                // Dolly bazlı kısıt (UX_DollyRequests_OpenPerDolly) v1.1 ile kaldırıldı.
+                builder.HasIndex(x => x.UldNumber)
                     .IsUnique()
                     .HasFilter("\"Status\" = 'Open'")
-                    .HasDatabaseName(DollyRequest.OpenPerDollyIndexName);
+                    .HasDatabaseName(DollyRequest.OpenPerUldIndexName);
 
                 builder.HasOne(x => x.Dolly)
                     .WithMany()

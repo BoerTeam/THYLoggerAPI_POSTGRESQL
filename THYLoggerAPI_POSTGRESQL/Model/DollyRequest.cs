@@ -3,8 +3,6 @@ using System.Text.Json.Serialization;
 
 namespace THYLoggerAPI_POSTGRESQL.Model
 {
-    // Enum üzerindeki JsonConverter sayesinde hem API çıktısında hem AuditLog JSON'unda
-    // sayı yerine "INBOUND" / "Open" gibi isimler görünür.
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public enum DollyOperationType
     {
@@ -19,19 +17,14 @@ namespace THYLoggerAPI_POSTGRESQL.Model
         Terminated = 2
     }
 
-    /// <summary>
-    /// BPM'den gelen talep: bir ULD/AWB'nin bir Cool Dolly'ye atanması.
-    /// Dolly ile ilişki DollyId üzerinden kurulur ("Cool Dolly No" -> Dolly.Name / Dolly.SerialNumber).
-    /// </summary>
     public class DollyRequest
     {
-        // Bir Dolly'nin aynı anda yalnızca 1 açık talebi olabilir (CD-002'nin DB seviyesinde garantisi)
-        public const string OpenPerDollyIndexName = "UX_DollyRequests_OpenPerDolly";
+        // Bir ULD'nin aynı anda yalnızca 1 açık talebi olabilir (KR-04 / CD-003 DB garantisi)
+        public const string OpenPerUldIndexName = "UX_DollyRequests_OpenPerUld";
 
         [Key]
         public int Id { get; set; }
 
-        // Cool Dolly'nin ürettiği referans no (BPM terminate'te bunu geri gönderir)
         public string ReferenceNumber { get; set; } = string.Empty;
 
         public DollyOperationType OperationType { get; set; }
@@ -51,5 +44,6 @@ namespace THYLoggerAPI_POSTGRESQL.Model
 
         public DateTime CreatedAt { get; set; }
         public DateTime? TerminatedAt { get; set; }
+        public DateTime? UpdatedAt { get; set; }
     }
 }
