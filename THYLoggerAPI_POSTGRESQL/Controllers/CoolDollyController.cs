@@ -7,12 +7,12 @@ using THYLoggerAPI_POSTGRESQL.Services;
 namespace THYLoggerAPI_POSTGRESQL.Controllers
 {
     /// <summary>
-    /// BPM -> Cool Dolly entegrasyon servisleri.
-    /// Cevap formatı servis mapping dokümanındaki (status/message/referenceNumber/timestamp) yapıdadır.
+    /// BPM -> Cool Dolly entegrasyon servisleri (Doküman v1.1).
+    /// Tüm endpoint'ler JSON listesi ([ {...} ]) alır ve satır bazlı sonuç listesi döner.
     /// </summary>
     [Route("api/[controller]")]
     [ApiController]
-    [ApiKeyAuth]
+    [BpmBasicAuth]
     [EnableRateLimiting("bpm-limit")]
     public class CoolDollyController : ControllerBase
     {
@@ -25,45 +25,69 @@ namespace THYLoggerAPI_POSTGRESQL.Controllers
             _logger = logger;
         }
 
-        // createCoolDollyRequest  ->  POST /api/CoolDolly/CreateRequest
+        // POST /api/CoolDolly/CreateCoolDollyRequest
         [HttpPost("CreateCoolDollyRequest")]
-        public async Task<IActionResult> CreateCoolDollyRequest([FromBody] CreateCoolDollyRequestDto dto)
+        public async Task<IActionResult> CreateCoolDollyRequest([FromBody] List<CreateCoolDollyRequestDto>? dtos)
         {
+            if (dtos == null || dtos.Count == 0)
+            {
+                return BadRequest(new[] { CoolDollyResponse.Error("CD-005", "İstek listesi boş olamaz") });
+            }
+
             try
             {
-                var result = await _service.CreateAsync(dto);
-                return Ok(result);
-            }
-            catch (CoolDollyException ex)
-            {
-                return StatusCode(ex.StatusCode, CoolDollyResponse.Error(ex.Code, ex.Message));
+                var results = await _service.CreateBatchAsync(dtos);
+                return Ok(results);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "createCoolDollyRequest sırasında beklenmeyen hata!");
-                var sys = CoolDollyException.SystemError();
-                return StatusCode(sys.StatusCode, CoolDollyResponse.Error(sys.Code, sys.Message));
+                _logger.LogError(ex, "CreateCoolDollyRequest batch işlemi sırasında beklenmeyen sistem hatası!");
+                return StatusCode(StatusCodes.Status500InternalServerError,
+                    new[] { CoolDollyResponse.Error("CD-004", "Sistem hatası") });
             }
         }
 
-        // terminateCoolDollyRequest  ->  POST /api/CoolDolly/TerminateRequest
-        [HttpPost("TerminateCoolDollyRequest")]
-        public async Task<IActionResult> TerminateCoolDollyRequest([FromBody] TerminateCoolDollyRequestDto dto)
+        // POST /api/CoolDolly/UpdateCoolDollyRequest
+        [HttpPost("UpdateCoolDollyRequest")]
+        public async Task<IActionResult> UpdateCoolDollyRequest([FromBody] List<UpdateCoolDollyRequestDto>? dtos)
         {
+            if (dtos == null || dtos.Count == 0)
+            {
+                return BadRequest(new[] { CoolDollyResponse.Error("CD-005", "İstek listesi boş olamaz") });
+            }
+
             try
             {
-                var result = await _service.TerminateAsync(dto);
-                return Ok(result);
-            }
-            catch (CoolDollyException ex)
-            {
-                return StatusCode(ex.StatusCode, CoolDollyResponse.Error(ex.Code, ex.Message));
+                var results = await _service.UpdateBatchAsync(dtos);
+                return Ok(results);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "terminateCoolDollyRequest sırasında beklenmeyen hata!");
-                var sys = CoolDollyException.SystemError();
-                return StatusCode(sys.StatusCode, CoolDollyResponse.Error(sys.Code, sys.Message));
+                _logger.LogError(ex, "UpdateCoolDollyRequest batch işlemi sırasında beklenmeyen sistem hatası!");
+                return StatusCode(StatusCodes.Status500InternalServerError,
+                    new[] { CoolDollyResponse.Error("CD-004", "Sistem hatası") });
+            }
+        }
+
+        // POST /api/CoolDolly/TerminateCoolDollyRequest
+        [HttpPost("TerminateCoolDollyRequest")]
+        public async Task<IActionResult> TerminateCoolDollyRequest([FromBody] List<TerminateCoolDollyRequestDto>? dtos)
+        {
+            if (dtos == null || dtos.Count == 0)
+            {
+                return BadRequest(new[] { CoolDollyResponse.Error("CD-005", "İstek listesi boş olamaz") });
+            }
+
+            try
+            {
+                var results = await _service.TerminateBatchAsync(dtos);
+                return Ok(results);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "TerminateCoolDollyRequest batch işlemi sırasında beklenmeyen sistem hatası!");
+                return StatusCode(StatusCodes.Status500InternalServerError,
+                    new[] { CoolDollyResponse.Error("CD-004", "Sistem hatası") });
             }
         }
     }

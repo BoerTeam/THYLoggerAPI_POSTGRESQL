@@ -201,6 +201,25 @@ using (var scope = app.Services.CreateScope())
 
 // 2. HTTP Request Pipeline (Middleware) Yapýlandýrmasý
 app.UseSerilogRequestLogging();
+var bpmWebServiceHost = builder.Configuration["BpmIntegration:PublicHost"];
+if (!string.IsNullOrWhiteSpace(bpmWebServiceHost))
+{
+    app.Use(async (context, next) =>
+    {
+        var host = context.Request.Host.Host;
+
+        if (string.Equals(host, bpmWebServiceHost, StringComparison.OrdinalIgnoreCase))
+        {
+            if (!context.Request.Path.StartsWithSegments("/api/CoolDolly", StringComparison.OrdinalIgnoreCase))
+            {
+                context.Response.StatusCode = StatusCodes.Status404NotFound;
+                return;
+            }
+        }
+
+        await next();
+    });
+}
 app.UseSwagger();
 app.UseSwaggerUI(c =>
 {

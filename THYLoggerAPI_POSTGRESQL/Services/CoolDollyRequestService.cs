@@ -21,7 +21,7 @@ namespace THYLoggerAPI_POSTGRESQL.Services
         }
 
         // ------------------------------------------------------------------
-        // Format kuralları (varsayım - gerekirse gevşetin)
+        // Format kuralları
         // ------------------------------------------------------------------
         private static readonly Regex FlightNoRegex = new(@"^[A-Z0-9]{2}\d{1,4}[A-Z]?$", RegexOptions.Compiled);   // TK0001
         private static readonly Regex StationRegex = new(@"^[A-Z]{3}$", RegexOptions.Compiled);                    // IST
@@ -29,11 +29,40 @@ namespace THYLoggerAPI_POSTGRESQL.Services
         private static readonly Regex UldRegex = new(@"^[A-Z]{3}\d{4,5}[A-Z0-9]{2,3}$", RegexOptions.Compiled);    // AKE12345TK
 
         // ==================================================================
-        // BPM -> createCoolDollyRequest
+        // 1. BPM -> createCoolDollyRequest (Batch)
+        // Gelen ULD'nin aktif kaydı yoksa Create, aktif kaydı varsa mevcut
+        // referansı korunarak Update çalışır.
         // ==================================================================
-        public async Task<CoolDollyResponse> CreateAsync(CreateCoolDollyRequestDto dto)
+        public async Task<List<CoolDollyResponse>> CreateBatchAsync(List<CreateCoolDollyRequestDto> dtos)
         {
-            // 1) Alan doğrulama / normalizasyon
+            var results = new List<CoolDollyResponse>(dtos.Count);
+            var seenUldsInBatch = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var dto in dtos)
+            {
+                var rawUld = dto.UldNumber?.Trim().Replace(" ", "").ToUpperInvariant();
+                try
+                {
+                    var response = await CreateSingleAsync(dto, seenUldsInBatch);
+                    results.Add(response);
+                }
+                catch (CoolDollyException ex)
+                {
+                    results.Add(CoolDollyResponse.Error(ex.Code, ex.Message, rawUld));
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Create satırı işlenirken sistem hatası. ULD: {Uld}", rawUld);
+                    results.Add(CoolDollyResponse.Error("CD-004", "Sistem hatası", rawUld));
+                }
+            }
+
+            return results;
+        }
+
+        private async Task<CoolDollyResponse> CreateSingleAsync(CreateCoolDollyRequestDto dto, HashSet<string> seenUldsInBatch)
+        {
+            // 1) Alan doğrulama & normalizasyon
             var operationType = ParseOperationType(dto.OperationType);
             var awbNumber = NormalizeAwb(dto.AwbNumber);
             var flightNumber = RequireMatch(dto.FlightNumber, "flightNumber", FlightNoRegex);
@@ -45,43 +74,59 @@ namespace THYLoggerAPI_POSTGRESQL.Services
             var dollyNo = NormalizeDollyNo(dto.CoolDollyNumber);
 
             _logger.LogInformation(
-                "BPM talep kaydetme isteği alındı. Dolly: {DollyNo}, AWB: {Awb}, ULD: {Uld}, Uçuş: {Flight} {FlightDate}",
+                "BPM Create/Upsert satırı işleniyor. Dolly: {DollyNo}, AWB: {Awb}, ULD: {Uld}, Uçuş: {Flight} {FlightDate}",
                 dollyNo, awbNumber, uldNumber, flightNumber, flightDate);
 
-            // 2) Dolly'yi bul (CD-001)
+            // Aynı liste içinde mükerrer ULD kontrolü (Doküman 4.1)
+            if (!seenUldsInBatch.Add(uldNumber))
+            {
+                _logger.LogWarning("Create listesi içinde mükerrer ULD gönderildi. ULD: {Uld}", uldNumber);
+                throw CoolDollyException.UldNotAvailable("ULD müsait değil (liste içinde mükerrer ULD)");
+            }
+
+            // 2) Dolly geçerlilik kontrolü (CD-001) - Müsaitlik kontrolü (CD-002) kapsam dışı
             var dolly = await FindDollyAsync(dollyNo);
 
-            // 3) İdempotency: BPM timeout sonrası aynı isteği tekrar gönderebilir.
-            var existing = await _context.DollyRequests.AsNoTracking().FirstOrDefaultAsync(r =>
-                r.DollyId == dolly.Id &&
-                r.Status == DollyRequestStatus.Open &&
-                r.AwbNumber == awbNumber &&
-                r.UldNumber == uldNumber);
+            // 3) ULD'nin aktif (Open) kaydı var mı kontrol et
+            var existingOpenRequest = await _context.DollyRequests
+                 .Include(r => r.Dolly)
+                 .FirstOrDefaultAsync(r => r.UldNumber == uldNumber && r.Status == DollyRequestStatus.Open);
 
-            if (existing != null)
+            // 3a) Aktif kayıt VARSA -> Mevcut referans korunarak UPDATE yap
+            // 3a) Aktif kayıt VARSA:
+            if (existingOpenRequest != null)
             {
-                _logger.LogInformation("Aynı talep zaten kayıtlı. Ref: {Ref}", existing.ReferenceNumber);
-                return CoolDollyResponse.Success("Talep zaten kayıtlı", existing.ReferenceNumber);
+                // Eğer aktif kayıt FARKLI bir Dolly'ye aitse -> ULD şu an o Dolly'de dolu! CD-003 dön.
+                if (existingOpenRequest.DollyId != dolly.Id)
+                {
+                    _logger.LogWarning(
+                        "ULD zaten başka bir Dolly'de aktif! ULD: {Uld}, MevcutDolly: {MevcutDolly}, İstenenDolly: {YeniDolly}",
+                        uldNumber, existingOpenRequest.Dolly?.Name, dolly.Name);
+
+                    throw CoolDollyException.UldNotAvailable(
+                        $"ULD müsait değil (şu an {existingOpenRequest.Dolly?.Name} üzerinde aktif)");
+                }
+
+                // Aynı Dolly üzerinde ise -> Mevcut referans korunarak diğer alanları UPDATE yap
+                existingOpenRequest.OperationType = operationType;
+                existingOpenRequest.AwbNumber = awbNumber;
+                existingOpenRequest.FlightNumber = flightNumber;
+                existingOpenRequest.FlightDate = flightDate;
+                existingOpenRequest.DepartureStation = departureStation;
+                existingOpenRequest.ArrivalStation = arrivalStation;
+                existingOpenRequest.SccCode = sccCode;
+                existingOpenRequest.UpdatedAt = DateTime.UtcNow;
+
+                await _context.SaveChangesAsync();
+
+                _logger.LogInformation("Aynı Dolly üzerindeki aktif ULD kaydı güncellendi. ULD: {Uld}, Ref: {Ref}, Dolly: {Dolly}",
+                    uldNumber, existingOpenRequest.ReferenceNumber, dolly.Name);
+
+                return CoolDollyResponse.Success("Talep güncellendi", uldNumber, existingOpenRequest.ReferenceNumber);
             }
 
-            // 4) Müsaitlik (CD-002): pasif Dolly veya zaten açık talebi olan Dolly
-            if (!dolly.IsActive)
-            {
-                _logger.LogWarning("Pasif Dolly'ye atama denendi. Dolly: {Dolly}", dolly.Name);
-                throw CoolDollyException.DollyNotAvailable();
-            }
-
-            var hasOpenRequest = await _context.DollyRequests
-                .AnyAsync(r => r.DollyId == dolly.Id && r.Status == DollyRequestStatus.Open);
-
-            if (hasOpenRequest)
-            {
-                _logger.LogWarning("Dolly başka bir açık talepte. Dolly: {Dolly}", dolly.Name);
-                throw CoolDollyException.DollyNotAvailable();
-            }
-
-            // 5) Kaydet
-            var request = new DollyRequest
+            // 3b) Aktif kayıt YOKSA -> Yeni referansla CREATE yap
+            var newRequest = new DollyRequest
             {
                 ReferenceNumber = GenerateReferenceNumber(),
                 OperationType = operationType,
@@ -99,75 +144,187 @@ namespace THYLoggerAPI_POSTGRESQL.Services
 
             try
             {
-                await _context.DollyRequests.AddAsync(request);
+                await _context.DollyRequests.AddAsync(newRequest);
                 await _context.SaveChangesAsync();
             }
             catch (DbUpdateException ex) when (ex.InnerException is PostgresException
             {
-                ConstraintName: DollyRequest.OpenPerDollyIndexName
+                ConstraintName: DollyRequest.OpenPerUldIndexName
             })
             {
-                // Aynı anda iki istek aynı Dolly'yi almaya çalıştı; partial unique index kazananı belirledi.
-                _logger.LogWarning("Eşzamanlı atama çakışması. Dolly: {Dolly}", dolly.Name);
-                throw CoolDollyException.DollyNotAvailable();
+                _context.Entry(newRequest).State = EntityState.Detached;
+                _logger.LogWarning("Eşzamanlı ULD atama çakışması. ULD: {Uld}", uldNumber);
+                throw CoolDollyException.UldNotAvailable();
             }
 
-            _logger.LogInformation("Dolly talebi oluşturuldu. Dolly: {Dolly}, Ref: {Ref}", dolly.Name, request.ReferenceNumber);
-            return CoolDollyResponse.Success("Talep oluşturuldu", request.ReferenceNumber);
+            _logger.LogInformation("Yeni talep oluşturuldu. Dolly: {Dolly}, ULD: {Uld}, Ref: {Ref}",
+                dolly.Name, uldNumber, newRequest.ReferenceNumber);
+
+            return CoolDollyResponse.Success("Talep oluşturuldu", uldNumber, newRequest.ReferenceNumber);
         }
 
         // ==================================================================
-        // BPM -> terminateCoolDollyRequest
+        // 2. BPM -> updateCoolDollyRequest (Batch - Doküman 3.3 & 4.3 & KR-02)
         // ==================================================================
-        public async Task<CoolDollyResponse> TerminateAsync(TerminateCoolDollyRequestDto dto)
+        public async Task<List<CoolDollyResponse>> UpdateBatchAsync(List<UpdateCoolDollyRequestDto> dtos)
+        {
+            var results = new List<CoolDollyResponse>(dtos.Count);
+
+            foreach (var dto in dtos)
+            {
+                var rawUld = dto.UldNumber?.Trim().Replace(" ", "").ToUpperInvariant();
+                var rawRef = dto.RequestReferenceNo?.Trim();
+                try
+                {
+                    var response = await UpdateSingleAsync(dto);
+                    results.Add(response);
+                }
+                catch (CoolDollyException ex)
+                {
+                    results.Add(CoolDollyResponse.Error(ex.Code, ex.Message, rawUld, rawRef));
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Update satırı işlenirken sistem hatası. ULD: {Uld}, Ref: {Ref}", rawUld, rawRef);
+                    results.Add(CoolDollyResponse.Error("CD-004", "Sistem hatası", rawUld, rawRef));
+                }
+            }
+
+            return results;
+        }
+
+        private async Task<CoolDollyResponse> UpdateSingleAsync(UpdateCoolDollyRequestDto dto)
+        {
+            var referenceNo = RequireText(dto.RequestReferenceNo, "requestReferenceNo");
+            var uldNumber = NormalizeUld(dto.UldNumber);
+            var operationType = ParseOperationType(dto.OperationType);
+            var awbNumber = NormalizeAwb(dto.AwbNumber);
+            var flightNumber = RequireMatch(dto.FlightNumber, "flightNumber", FlightNoRegex);
+            var flightDate = ParseFlightDate(dto.FlightDate);
+            var departureStation = RequireMatch(dto.DepartureStation, "departureStation", StationRegex);
+            var arrivalStation = RequireMatch(dto.ArrivalStation, "arrivalStation", StationRegex);
+            var sccCode = NormalizeScc(dto.SccCode);
+            var dollyNo = NormalizeDollyNo(dto.CoolDollyNumber);
+
+            // Yeni atanan/güncellenen Dolly geçerli olmalı (CD-001)
+            var dolly = await FindDollyAsync(dollyNo);
+
+            // KR-02: Aynı uldNumber ve referans için aktif eşleşme aranır
+            var request = await _context.DollyRequests
+                .FirstOrDefaultAsync(r =>
+                    r.ReferenceNumber == referenceNo &&
+                    r.UldNumber == uldNumber &&
+                    r.Status == DollyRequestStatus.Open);
+
+            if (request == null)
+            {
+                _logger.LogWarning("Update için aktif ULD-Referans eşleşmesi bulunamadı. ULD: {Uld}, Ref: {Ref}",
+                    uldNumber, referenceNo);
+                throw CoolDollyException.RequestNotFound();
+            }
+
+            // Mevcut referans korunarak diğer alanlar güncellenir
+            request.OperationType = operationType;
+            request.AwbNumber = awbNumber;
+            request.FlightNumber = flightNumber;
+            request.FlightDate = flightDate;
+            request.DepartureStation = departureStation;
+            request.ArrivalStation = arrivalStation;
+            request.SccCode = sccCode;
+            request.DollyId = dolly.Id;
+            request.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Talep güncellendi. ULD: {Uld}, Ref: {Ref}, Dolly: {Dolly}",
+                uldNumber, request.ReferenceNumber, dolly.Name);
+
+            return CoolDollyResponse.Success("Talep güncellendi", uldNumber, request.ReferenceNumber);
+        }
+
+        // ==================================================================
+        // 3. BPM -> terminateCoolDollyRequest (Batch - Doküman 3.2 & 4.2 & KR-03)
+        // ==================================================================
+        public async Task<List<CoolDollyResponse>> TerminateBatchAsync(List<TerminateCoolDollyRequestDto> dtos)
+        {
+            var results = new List<CoolDollyResponse>(dtos.Count);
+
+            foreach (var dto in dtos)
+            {
+                var rawUld = dto.UldNumber?.Trim().Replace(" ", "").ToUpperInvariant();
+                var rawRef = dto.RequestReferenceNo?.Trim();
+                try
+                {
+                    var response = await TerminateSingleAsync(dto);
+                    results.Add(response);
+                }
+                catch (CoolDollyException ex)
+                {
+                    results.Add(CoolDollyResponse.Error(ex.Code, ex.Message, rawUld, rawRef));
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Terminate satırı işlenirken sistem hatası. ULD: {Uld}, Ref: {Ref}", rawUld, rawRef);
+                    results.Add(CoolDollyResponse.Error("CD-004", "Sistem hatası", rawUld, rawRef));
+                }
+            }
+
+            return results;
+        }
+
+        private async Task<CoolDollyResponse> TerminateSingleAsync(TerminateCoolDollyRequestDto dto)
         {
             var operationType = ParseOperationType(dto.OperationType);
             var referenceNo = RequireText(dto.RequestReferenceNo, "requestReferenceNo");
+            var uldNumber = NormalizeUld(dto.UldNumber);
             var flightNumber = RequireMatch(dto.FlightNumber, "flightNumber", FlightNoRegex);
             var flightDate = ParseFlightDate(dto.FlightDate);
             var dollyNo = NormalizeDollyNo(dto.CoolDollyNumber);
 
-            _logger.LogInformation("BPM talep sonlandırma isteği alındı. Ref: {Ref}, Dolly: {DollyNo}", referenceNo, dollyNo);
+            _logger.LogInformation("BPM talep sonlandırma isteği alındı. Ref: {Ref}, ULD: {Uld}, Dolly: {DollyNo}",
+                referenceNo, uldNumber, dollyNo);
 
+            // Gönderilen Dolly sistemde kayıtlı/geçerli olmalı (CD-001)
+            await FindDollyAsync(dollyNo);
+
+            // KR-03: Gönderilen ULD ve referansın aktif eşleşmesini ara
             var request = await _context.DollyRequests
                 .Include(r => r.Dolly)
-                .FirstOrDefaultAsync(r => r.ReferenceNumber == referenceNo);
+                .FirstOrDefaultAsync(r =>
+                    r.ReferenceNumber == referenceNo &&
+                    r.UldNumber == uldNumber &&
+                    r.Status == DollyRequestStatus.Open);
 
             if (request == null)
             {
-                _logger.LogWarning("Sonlandırılacak talep bulunamadı. Ref: {Ref}", referenceNo);
+                _logger.LogWarning("Terminate için aktif ULD-Referans eşleşmesi bulunamadı. ULD: {Uld}, Ref: {Ref}",
+                    uldNumber, referenceNo);
                 throw CoolDollyException.RequestNotFound();
             }
 
-            // Gönderilen Dolly bu talebe ait olmalı
+            // Gönderilen Dolly bu talepteki Dolly ile uyuşmalı
             if (!DollyMatches(request.Dolly!, dollyNo))
             {
-                _logger.LogWarning("Terminate'te Dolly uyuşmadı. Ref: {Ref}, Gelen: {DollyNo}, Kayıtlı: {Dolly}",
+                _logger.LogWarning("Terminate isteğinde Dolly uyuşmadı. Ref: {Ref}, Gelen: {DollyNo}, Kayıtlı: {Dolly}",
                     referenceNo, dollyNo, request.Dolly!.Name);
                 throw CoolDollyException.InvalidDolly();
             }
 
-            // Uçuş / işlem tipi uyuşmazlığı reddedilmiyor, sadece loglanıyor (iş kuralı netleşince sıkılaştırılabilir)
             if (request.OperationType != operationType ||
                 request.FlightNumber != flightNumber ||
                 request.FlightDate != flightDate)
             {
-                _logger.LogWarning(
-                    "Terminate isteğindeki uçuş/işlem bilgisi talepten farklı. Ref: {Ref}", referenceNo);
-            }
-
-            // İdempotent: zaten kapalıysa başarılı say
-            if (request.Status == DollyRequestStatus.Terminated)
-            {
-                return CoolDollyResponse.Success("Talep zaten sonlandırılmış", request.ReferenceNumber);
+                _logger.LogWarning("Terminate isteğindeki uçuş/işlem bilgisi talepten farklı. Ref: {Ref}", referenceNo);
             }
 
             request.Status = DollyRequestStatus.Terminated;
             request.TerminatedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
 
-            _logger.LogInformation("Dolly boşaltıldı. Dolly: {Dolly}, Ref: {Ref}", request.Dolly!.Name, request.ReferenceNumber);
-            return CoolDollyResponse.Success("Dolly boşaltıldı", request.ReferenceNumber);
+            _logger.LogInformation("Talep sonlandırıldı, ULD serbest bırakıldı. Dolly: {Dolly}, ULD: {Uld}, Ref: {Ref}",
+                request.Dolly!.Name, uldNumber, request.ReferenceNumber);
+
+            return CoolDollyResponse.Success("Talep sonlandırıldı", uldNumber, request.ReferenceNumber);
         }
 
         // ==================================================================
@@ -302,8 +459,8 @@ namespace THYLoggerAPI_POSTGRESQL.Services
         // Eşleşme Dolly.Name VEYA Dolly.SerialNumber üzerinden yapılır.
         private async Task<Dolly> FindDollyAsync(string dollyNo)
         {
-            var dolly = await _context.Dolly.FirstOrDefaultAsync(d =>
-                d.Name.ToUpper() == dollyNo || d.SerialNumber.ToUpper() == dollyNo);
+            var dolly = await _context.Dolly.AsNoTracking().FirstOrDefaultAsync(d =>
+                d.Name.ToUpper() == dollyNo || d.Name.ToUpper() == dollyNo);
 
             if (dolly == null)
             {
@@ -315,8 +472,7 @@ namespace THYLoggerAPI_POSTGRESQL.Services
         }
 
         private static bool DollyMatches(Dolly dolly, string dollyNo) =>
-            string.Equals(dolly.Name, dollyNo, StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(dolly.SerialNumber, dollyNo, StringComparison.OrdinalIgnoreCase);
+                 string.Equals(dolly.Name, dollyNo, StringComparison.OrdinalIgnoreCase);
 
         private static string GenerateReferenceNumber() =>
             $"CD-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString("N")[..8].ToUpperInvariant()}";
