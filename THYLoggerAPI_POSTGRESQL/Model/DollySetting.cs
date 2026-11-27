@@ -35,5 +35,7 @@ namespace THYLoggerAPI_POSTGRESQL.Model
         public DateTime? LastErrorAt { get; set; }
 
         public DateTime UpdatedAt { get; set; }
+        public string? AppliedImageName { get; set; }
+        public DateTime? ImageAppliedAt { get; set; }
     }
 }

@@ -147,9 +147,22 @@ namespace THYLoggerAPI_POSTGRESQL.Controllers
         public IActionResult DownloadImage([FromQuery] string? fileName)
         {
             var path = _configService.ResolveImagePath(fileName);
-            if (path == null) return NotFound("İmaj dosyası bulunamadı.");
+            if (path == null)
+            {
+                // Geçici teşhis bilgisi: Uygulamanın gerçekte baktığı klasörü gösterir
+                return NotFound(new
+                {
+                    message = "İmaj dosyası bulunamadı.",
+                    gelenParametre = fileName,
+                    arananKlasor = Path.Combine(AppContext.BaseDirectory, "Images")
+                });
+            }
 
-            return PhysicalFile(path, "application/x-tar", Path.GetFileName(path), enableRangeProcessing: true);
+            var contentType = path.EndsWith(".gz", StringComparison.OrdinalIgnoreCase) || path.EndsWith(".tgz", StringComparison.OrdinalIgnoreCase)
+                ? "application/gzip"
+                : "application/x-tar";
+
+            return PhysicalFile(path, contentType, Path.GetFileName(path), enableRangeProcessing: true);
         }
     }
 }

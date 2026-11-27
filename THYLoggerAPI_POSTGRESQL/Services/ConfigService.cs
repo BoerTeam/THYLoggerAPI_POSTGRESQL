@@ -160,7 +160,17 @@ namespace THYLoggerAPI_POSTGRESQL.Services
                 // Başarılı uygulama önceki hatayı geçersiz kılar
                 setting.LastError = null;
                 setting.LastErrorAt = null;
-                AddEvent(dolly.Id, DollyConfigEventTypes.Applied, request.ConfigVersion, "Cihaz konfigürasyonu uyguladı.", appliedAt);
+                if (!string.IsNullOrWhiteSpace(request.AppliedImageName))
+                {
+                    var imgName = Path.GetFileName(request.AppliedImageName.Trim());
+                    setting.AppliedImageName = imgName;
+                    setting.ImageAppliedAt = appliedAt;
+                    AddEvent(dolly.Id, DollyConfigEventTypes.Applied, request.ConfigVersion, $"İmaj kabul edildi: {imgName}", appliedAt);
+                }
+                else
+                {
+                    AddEvent(dolly.Id, DollyConfigEventTypes.Applied, request.ConfigVersion, "Cihaz konfigürasyonu uyguladı.", appliedAt);
+                }
             }
 
             await _context.SaveChangesAsync();
@@ -206,19 +216,31 @@ namespace THYLoggerAPI_POSTGRESQL.Services
         // İMAJ (Images/ dizini)
         // ==========================================
 
+        // ==========================================
+        // İMAJ (Images/ dizini)
+        // ==========================================
+
         private string ImagesDir => Path.Combine(_env.ContentRootPath, "Images");
 
-        /// <summary>Images/ içindeki en son yüklenen .tar dosyasının adı; yoksa null.</summary>
+        private static bool IsValidImageExtension(string fileName) =>
+            fileName.EndsWith(".tar", StringComparison.OrdinalIgnoreCase) ||
+            fileName.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase) ||
+            fileName.EndsWith(".tgz", StringComparison.OrdinalIgnoreCase);
+
+        /// <summary>Images/ içindeki en son yüklenen imaj dosyasının adı; yoksa null.</summary>
         public string? GetLastImageName()
         {
             if (!Directory.Exists(ImagesDir)) return null;
-            return new DirectoryInfo(ImagesDir).EnumerateFiles("*.tar")
+
+            return new DirectoryInfo(ImagesDir)
+                .EnumerateFiles()
+                .Where(f => IsValidImageExtension(f.Name))
                 .OrderByDescending(f => f.LastWriteTimeUtc)
                 .Select(f => f.Name)
                 .FirstOrDefault();
         }
 
-        /// <summary>İmaj .tar dosyasını Images/ altına yazar; aynı adla ezilmesin diye zaman damgası öneki eklenir.</summary>
+        /// <summary>İmaj dosyasını Images/ altına yazar; aynı adla ezilmesin diye zaman damgası öneki eklenir.</summary>
         public async Task<(bool IsSuccess, string? ErrorMessage, string? FileName)> SaveImageAsync(IFormFile? imageFile)
         {
             if (imageFile == null || imageFile.Length == 0)
@@ -226,15 +248,13 @@ namespace THYLoggerAPI_POSTGRESQL.Services
             if (imageFile.Length > MaxImageFileBytes)
                 return (false, "ImageFile en fazla 2 GB olabilir.", null);
 
-            // Dosya adı kullanıcı girdisinden geldiği için path traversal'a karşı temizlenir
-            var safeName = Path.GetFileName(imageFile.FileName);
-            if (string.IsNullOrWhiteSpace(safeName) || !safeName.EndsWith(".tar", StringComparison.OrdinalIgnoreCase))
-                return (false, "ImageFile bir .tar dosyası olmalıdır.", null);
+            var safeName = Path.GetFileName(imageFile.FileName).Trim();
+            if (string.IsNullOrWhiteSpace(safeName) || !IsValidImageExtension(safeName))
+                return (false, "ImageFile bir .tar, .tar.gz veya .tgz dosyası olmalıdır.", null);
 
             var fileName = $"{TurkeyNow():yyyyMMdd_HHmmss}_{safeName}";
             Directory.CreateDirectory(ImagesDir);
 
-            // Yarım yüklenen dosya "son imaj" olarak görünmesin diye önce .part'a yazılıp sonra taşınır
             var finalPath = Path.Combine(ImagesDir, fileName);
             var tempPath = finalPath + ".part";
             try
@@ -254,12 +274,15 @@ namespace THYLoggerAPI_POSTGRESQL.Services
             return (true, null, fileName);
         }
 
-        /// <summary>İndirilecek imajın tam yolunu döner (yalnızca Images/ içindeki .tar dosyaları).</summary>
+        /// <summary>İndirilecek imajın tam yolunu döner (yalnızca Images/ içindeki geçerli imaj dosyaları).</summary>
         public string? ResolveImagePath(string? fileName)
         {
             if (string.IsNullOrWhiteSpace(fileName)) return null;
-            var safeName = Path.GetFileName(fileName);
-            if (safeName != fileName || !safeName.EndsWith(".tar", StringComparison.OrdinalIgnoreCase)) return null;
+
+            var trimmedName = fileName.Trim();
+            var safeName = Path.GetFileName(trimmedName);
+
+            if (safeName != trimmedName || !IsValidImageExtension(safeName)) return null;
 
             var path = Path.Combine(ImagesDir, safeName);
             return File.Exists(path) ? path : null;
@@ -271,6 +294,8 @@ namespace THYLoggerAPI_POSTGRESQL.Services
 
         public async Task<ConfigDeviceListResponse> GetDevicesAsync()
         {
+            var latestImage = GetLastImageName();
+
             var rows = await _context.Dolly.AsNoTracking()
                 .OrderBy(d => d.Name)
                 .GroupJoin(_context.DollySettings.AsNoTracking(), d => d.Id, s => s.DollyId, (d, s) => new { d, s })
@@ -290,6 +315,9 @@ namespace THYLoggerAPI_POSTGRESQL.Services
                 FetchedAt = r.s?.FetchedAt,
                 AppliedConfigVersion = r.s?.AppliedConfigVersion,
                 AppliedAt = r.s?.AppliedAt,
+                AppliedImageName = r.s?.AppliedImageName,
+                ImageAppliedAt = r.s?.ImageAppliedAt,
+                IsImageUpToDate = !string.IsNullOrEmpty(latestImage) && r.s?.AppliedImageName == latestImage,
                 LastSeenAt = r.s?.LastSeenAt,
                 LastError = r.s?.LastError,
                 LastErrorAt = r.s?.LastErrorAt,
@@ -388,6 +416,9 @@ namespace THYLoggerAPI_POSTGRESQL.Services
             if (c.SendIntervalSec < 1) return "sendIntervalSec en az 1 olmalıdır.";
             if (c.GpsIntervalSec < 1) return "gpsIntervalSec en az 1 olmalıdır.";
             if (c.GpsNoFixLogIntervalSec < 1) return "gpsNoFixLogIntervalSec en az 1 olmalıdır.";
+
+            if (c.UpdateHealthOkSec < 1) return "updateHealthOkSec en az 1 olmalıdır.";
+            if (c.UpdateHealthMaxSec < c.UpdateHealthOkSec) return "updateHealthMaxSec, updateHealthOkSec değerinden küçük olamaz.";
 
             foreach (var ch in c.AnalogChannels)
             {

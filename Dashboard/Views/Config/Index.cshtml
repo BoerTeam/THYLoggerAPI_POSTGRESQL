@@ -113,6 +113,32 @@
                     </div>
                 </div>
 
+                <h6 class="mt-2 mb-1">Güncelleme (OTA) Ayarları</h6>
+                <div class="row g-1 align-items-end">
+                    <div class="col-md-2">
+                        <label class="form-label small fw-bold mb-0">Health OK (sn)</label>
+                        <input type="number" min="1" required name="Config.UpdateHealthOkSec" value="@c.UpdateHealthOkSec" class="form-control form-control-sm" />
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small fw-bold mb-0">Health Max (sn)</label>
+                        <input type="number" min="1" required name="Config.UpdateHealthMaxSec" value="@c.UpdateHealthMaxSec" class="form-control form-control-sm" />
+                    </div>
+                    <div class="col-auto ms-2 pb-1">
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" id="chkUpdateEnabled" name="Config.UpdateEnabled" value="true" checked="@c.UpdateEnabled" />
+                            <input type="hidden" name="Config.UpdateEnabled" value="false" />
+                            <label class="form-check-label" for="chkUpdateEnabled">Güncelleme aktif (UpdateEnabled)</label>
+                        </div>
+                    </div>
+                    <div class="col-auto ms-2 pb-1">
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" id="chkUpdateRequireIdle" name="Config.UpdateRequireIdle" value="true" checked="@c.UpdateRequireIdle" />
+                            <input type="hidden" name="Config.UpdateRequireIdle" value="false" />
+                            <label class="form-check-label" for="chkUpdateRequireIdle">Boşta olmayı bekle (RequireIdle)</label>
+                        </div>
+                    </div>
+                </div>
+
                 <h6 class="mt-2 mb-1">Gönderilecek veriler</h6>
                 <div class="d-flex flex-wrap gap-2">
                     @foreach (var (key, label, val) in new[] {
@@ -154,12 +180,27 @@
                 <h6 class="mt-2 mb-1">Endpoint'ler</h6>
                 <div class="row g-1">
                     @foreach (var (key, label, val) in new[] {
-                        ("Nem", "Nem", c.Endpoints.Nem), ("Sicaklik", "Sıcaklık", c.Endpoints.Sicaklik),
-                        ("Gps", "GPS", c.Endpoints.Gps), ("DoluBos", "Dolu/Boş", c.Endpoints.DoluBos) })
+    ("Nem", "Nem", c.Endpoints.Nem), ("Sicaklik", "Sıcaklık", c.Endpoints.Sicaklik),
+    ("Gps", "GPS", c.Endpoints.Gps), ("DoluBos", "Dolu/Boş", c.Endpoints.DoluBos),
+    ("ApiURL", "ApiURL", c.Endpoints.ApiURL),
+    ("TestApiURL", "Test ApiURL", "https://cooldollytest.thy.com/api/") })
                     {
+                        var isReadOnly = key == "TestApiURL";
+
                         <div class="col-md-3">
                             <label class="form-label small fw-bold mb-0">@label</label>
-                            <input type="text" required pattern="/.*" name="Config.Endpoints.@key" value="@val" class="form-control form-control-sm" />
+                            <input type="text"
+                                   required
+                                   name="Config.Endpoints.@key"
+                                   value="@val"
+                                   class="form-control form-control-sm @(isReadOnly ? "bg-light" : "")"
+                                   readonly="@isReadOnly" />
+                            @if (isReadOnly)
+                            {
+                                <small class="form-text text-muted d-block mt-1">
+                                    Bu kısmı değiştirmek için Boer ile iletişime geçiniz.
+                                </small>
+                            }
                         </div>
                     }
                 </div>

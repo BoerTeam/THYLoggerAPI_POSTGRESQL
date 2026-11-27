@@ -8,6 +8,11 @@ namespace Dashboard.DTO
         public int SendIntervalSec { get; set; } = 60;
         public int GpsIntervalSec { get; set; } = 10;
         public int GpsNoFixLogIntervalSec { get; set; } = 60;
+
+        public bool UpdateEnabled { get; set; } = true;
+        public int UpdateHealthOkSec { get; set; } = 300;
+        public int UpdateHealthMaxSec { get; set; } = 600;
+        public bool UpdateRequireIdle { get; set; } = true;
         public DeviceSenders Senders { get; set; } = new();
         public List<AnalogChannel> AnalogChannels { get; set; } = new();
         public DeviceEndpoints Endpoints { get; set; } = new();
@@ -35,6 +40,8 @@ namespace Dashboard.DTO
         public string Sicaklik { get; set; } = string.Empty;
         public string Gps { get; set; } = string.Empty;
         public string DoluBos { get; set; } = string.Empty;
+        public string ApiURL { get; set; } = string.Empty;
+        public string TestApiURL { get; set; } = string.Empty;
     }
 
     public class ConfigPublishRequest

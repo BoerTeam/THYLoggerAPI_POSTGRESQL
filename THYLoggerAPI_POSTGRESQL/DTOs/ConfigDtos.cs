@@ -15,6 +15,7 @@ namespace THYLoggerAPI_POSTGRESQL.DTOs
         public string? SerialNumber { get; set; }
         public int? ConfigVersion { get; set; }
         public DateTime? AppliedAt { get; set; }
+        public string? AppliedImageName { get; set; } // Yeni eklendi
 
         // İsteğe bağlı: cihaz uygulama sırasında hata aldıysa false + errorMessage gönderir (varsayılan: başarılı)
         public bool? Success { get; set; }
@@ -68,6 +69,9 @@ namespace THYLoggerAPI_POSTGRESQL.DTOs
         public int? FetchedConfigVersion { get; set; }
         public DateTime? FetchedAt { get; set; }
         public int? AppliedConfigVersion { get; set; }
+        public string? AppliedImageName { get; set; }
+        public DateTime? ImageAppliedAt { get; set; }
+        public bool IsImageUpToDate { get; set; }
         public DateTime? AppliedAt { get; set; }
         public DateTime? LastSeenAt { get; set; }
         public string? LastError { get; set; }
@@ -120,6 +124,11 @@ namespace THYLoggerAPI_POSTGRESQL.DTOs
         public int SendIntervalSec { get; set; } = 60;
         public int GpsIntervalSec { get; set; } = 10;
         public int GpsNoFixLogIntervalSec { get; set; } = 60;
+
+        public bool UpdateEnabled { get; set; } = true;
+        public int UpdateHealthOkSec { get; set; } = 300;
+        public int UpdateHealthMaxSec { get; set; } = 600;
+        public bool UpdateRequireIdle { get; set; } = true;
         public DeviceSenders Senders { get; set; } = new();
         public List<AnalogChannel> AnalogChannels { get; set; } = new()
         {
@@ -136,6 +145,8 @@ namespace THYLoggerAPI_POSTGRESQL.DTOs
         public bool Sicaklik { get; set; } = true;
         public bool Gps { get; set; } = true;
         public bool DoluBos { get; set; } = true;
+        public bool ApiURL { get; set; } = true;
+        public bool TestApiURL { get; set; } = true;
     }
 
     public class AnalogChannel
@@ -154,5 +165,7 @@ namespace THYLoggerAPI_POSTGRESQL.DTOs
         public string Sicaklik { get; set; } = "/Sicaklik/Add";
         public string Gps { get; set; } = "/Gps/Add";
         public string DoluBos { get; set; } = "/DoluBos/Add";
+        public string ApiURL { get; set; } = "https://cooldollytest.thy.com/api/";
+        public string TestApiURL { get; set; } = "https://cooldollytest.thy.com/api/";
     }
 }
